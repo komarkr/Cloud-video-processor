@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project Specific Custom Ignores
+.env
+media/
+data/
+uploads/
+nginx/certs/*.pem

@@ -6,7 +6,6 @@ import jwt
 
 from app.config import settings
 
-# Initialize Argon2 password hasher
 _ph = PasswordHasher()
 
 

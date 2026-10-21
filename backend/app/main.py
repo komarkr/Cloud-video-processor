@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from app.config import settings
 from app.db import SessionLocal
@@ -36,7 +36,6 @@ def init_admin():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize admin
     init_admin()
     yield
 
@@ -47,6 +46,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def add_x_served_by_header(request: Request, call_next):
+    """Add X-Served-By header indicating which backend instance served the request."""
+    response = await call_next(request)
+    response.headers["X-Served-By"] = settings.server_id
+    return response
+
 
 # Register routers
 app.include_router(auth_router)

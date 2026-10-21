@@ -148,3 +148,12 @@ def test_logout_clears_cookie_and_revokes_access(client):
     # After logout, /api/me should return 401
     me_after_logout = client.get("/api/me")
     assert me_after_logout.status_code == 401
+
+
+def test_x_served_by_header_present(client):
+    """Test that X-Served-By middleware correctly sets header on response."""
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert "x-served-by" in response.headers
+    assert response.headers["x-served-by"] == settings.server_id
+

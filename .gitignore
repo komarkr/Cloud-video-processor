@@ -224,7 +224,6 @@ __marimo__/
 media/
 data/
 uploads/
-nginx/certs/*.pem
 .idea/
 .vscode/
 *.db

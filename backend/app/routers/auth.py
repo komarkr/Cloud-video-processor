@@ -17,6 +17,12 @@ router = APIRouter(prefix="/api", tags=["auth"])
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
 )
+@router.post(
+    "/auth/register",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 def register(
     user_in: UserRegister,
     db: Session = Depends(get_db),
@@ -44,6 +50,11 @@ def register(
     "/login",
     response_model=MessageResponse,
     summary="Login and receive HttpOnly JWT cookie",
+)
+@router.post(
+    "/auth/login",
+    response_model=MessageResponse,
+    include_in_schema=False,
 )
 def login(
     user_in: UserLogin,
@@ -88,6 +99,11 @@ def login(
     response_model=MessageResponse,
     summary="Logout and clear HttpOnly cookie",
 )
+@router.post(
+    "/auth/logout",
+    response_model=MessageResponse,
+    include_in_schema=False,
+)
 def logout(response: Response):
     """Clear HttpOnly authentication cookie."""
     response.delete_cookie(
@@ -104,6 +120,11 @@ def logout(response: Response):
     "/me",
     response_model=UserOut,
     summary="Get current authenticated user profile",
+)
+@router.get(
+    "/auth/me",
+    response_model=UserOut,
+    include_in_schema=False,
 )
 def get_me(current_user: User = Depends(get_current_user)):
     """Return profile of the currently logged-in user."""

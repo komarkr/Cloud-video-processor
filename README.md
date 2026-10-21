@@ -18,20 +18,20 @@ A distributed cloud video processing service demonstrating scalable architecture
 
 ## System Limits
 
-| Limit | Maximum Value |
-| :--- | :--- |
-| **File Size** | 100 MB |
-| **Video Duration**| 120 seconds |
-| **Active Tasks** | 5 per user *(queued + running)* |
-| **Task History** | 20 per user *(older tasks are auto-deleted)* |
-| **Global Queue** | 100 tasks *(rejects new tasks if overloaded)* |
-| **Result Lifetime**| 24 hours |
+| Limit | Environment Variable | Default Value | Description |
+| :--- | :--- | :--- | :--- |
+| **File Size** | `MAX_FILE_MB` | `100` MB | Maximum allowed upload size |
+| **Video Duration** | `MAX_DURATION_SEC` | `120` seconds | Maximum allowed duration |
+| **Active Tasks** | `MAX_ACTIVE_TASKS` | `5` | Active tasks per user *(queued + running)* |
+| **Task History** | `MAX_HISTORY` | `20` | Max tasks stored per user *(older are pruned)* |
+| **Global Queue** | `MAX_QUEUE` | `100` | Global queue capacity before rejecting |
+| **Result Lifetime** | `RESULT_LIFETIME_HOURS` | `24` hours | Lifetime of processed files on disk |
 
 ---
 
 ## Technology Stack
 
-* **Backend API:** Python 3.12, FastAPI, Uvicorn, Pydantic
+* **Backend API:** Python 3.12, FastAPI, Uvicorn, Pydantic (pydantic-settings)
 * **Video Processing:** FFmpeg, ffprobe, OpenCV
 * **Task Queue & Workers:** Celery, Redis
 * **Database:** PostgreSQL 16, SQLAlchemy 2, Alembic
@@ -49,9 +49,66 @@ A distributed cloud video processing service demonstrating scalable architecture
 
 ---
 
-## Local Setup
+## Quickstart & Local Setup
 
-**1. Clone the repository:**
+### 1. Environment Configuration
+Copy the sample environment file and adjust variables if needed:
 ```bash
-git clone https://github.com/komarkr/cloud-video-processor.git
-cd cloud-video-processor
+cp .env.example .env
+```
+
+Ensure `.env` contains:
+```env
+DB_USER=cvp
+DB_PASSWORD=my_secret_password
+DB_NAME=cvp
+DB_HOST=postgres
+DB_PORT=5432
+
+JWT_SECRET=super_secure_jwt_secret_key_12345
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=admin_password_123
+
+MAX_FILE_MB=100
+MAX_DURATION_SEC=120
+MAX_ACTIVE_TASKS=5
+MAX_HISTORY=20
+MAX_QUEUE=100
+RESULT_LIFETIME_HOURS=24
+```
+
+### 2. Build and Start Services
+Start the entire stack using Docker Compose:
+```bash
+docker compose up --build
+```
+
+This starts:
+- **`postgres`** on port `5432` with automatic health checks.
+- **`redis`** on port `6379`.
+- **`migrate`** runs `alembic upgrade head` to apply database schema migrations.
+- **`api1`** FastAPI backend application on port `8000`.
+
+### 3. Verify Health & Documentation
+- **Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+  ```json
+  {
+    "status": "ok",
+    "server_id": "api1"
+  }
+  ```
+- **Interactive API Docs (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+### 4. Database Inspection (DBeaver / psql)
+Connect using any PostgreSQL client (e.g., DBeaver, DataGrip, or `psql`):
+- **Host:** `localhost`
+- **Port:** `5432`
+- **Database:** `cvp`
+- **Username:** `cvp`
+- **Password:** value of `DB_PASSWORD` in `.env` (default: `my_secret_password`)
+
+Tables created by Alembic:
+- `users`: stores user accounts and password hashes.
+- `tasks`: stores video processing tasks and status (`task_status_enum`).
+- `alembic_version`: tracks current database migration state.

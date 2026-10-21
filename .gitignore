@@ -227,3 +227,5 @@ uploads/
 nginx/certs/*.pem
 .idea/
 .vscode/
+*.db
+cvp_test.db

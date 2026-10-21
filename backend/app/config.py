@@ -13,6 +13,11 @@ class Settings(BaseSettings):
 
     # Security & Admin
     jwt_secret: str = "super_secure_jwt_secret_key_12345"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
+    cookie_secure: bool = True
+    cookie_samesite: str = "lax"
+
     admin_email: str = "admin@example.com"
     admin_password: str = "admin_password_123"
 

@@ -1,59 +1,67 @@
 import enum
 import uuid
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Text
+import sqlalchemy as sa
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 from app.db import Base
 
 
 class TaskStatus(str, enum.Enum):
-  queued = "queued"
-  running = "running"
-  done = "done"
-  failed = "failed"
-  cancelled = "cancelled"
+    queued = "queued"
+    running = "running"
+    done = "done"
+    failed = "failed"
+    cancelled = "cancelled"
 
 
 class User(Base):
-  __tablename__ = "users"
+    __tablename__ = "users"
 
-  id = Column(
-      UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
-  )
-  email = Column(String, unique=True, index=True, nullable=False)
-  hashed_password = Column(String, nullable=False)
-  created_at = Column(
-      DateTime(timezone=True), server_default=func.now(), nullable=False
-  )
+    id = Column(
+        UUID(as_uuid=True).with_variant(sa.Uuid(as_uuid=True), "sqlite"),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Task(Base):
-  __tablename__ = "tasks"
+    __tablename__ = "tasks"
 
-  id = Column(
-      UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
-  )
-  user_id = Column(
-      UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-  )
-  status = Column(
-      Enum(TaskStatus, name="task_status_enum"),
-      default=TaskStatus.queued,
-      nullable=False,
-  )
-  operation_type = Column(
-      String, nullable=False
-  )  # наприклад: convert, scale, watermark тощо
-  params = Column(JSONB, nullable=True)  # параметри операції
-  input_file = Column(String, nullable=False)
-  output_file = Column(String, nullable=True)
-  error_message = Column(Text, nullable=True)
-  created_at = Column(
-      DateTime(timezone=True), server_default=func.now(), nullable=False
-  )
-  updated_at = Column(
-      DateTime(timezone=True),
-      server_default=func.now(),
-      onupdate=func.now(),
-      nullable=False,
-  )
+    id = Column(
+        UUID(as_uuid=True).with_variant(sa.Uuid(as_uuid=True), "sqlite"),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
+    user_id = Column(
+        UUID(as_uuid=True).with_variant(sa.Uuid(as_uuid=True), "sqlite"),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status = Column(
+        Enum(TaskStatus, name="task_status_enum"),
+        default=TaskStatus.queued,
+        nullable=False,
+    )
+    operation_type = Column(String, nullable=False)
+    params = Column(JSONB().with_variant(sa.JSON(), "sqlite"), nullable=True)
+    input_file = Column(String, nullable=False)
+    output_file = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

@@ -56,6 +56,9 @@ class Task(Base):
     input_file = Column(String, nullable=False)
     output_file = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
+    worker_id = Column(String, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

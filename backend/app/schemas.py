@@ -38,6 +38,9 @@ class TaskOut(BaseModel):
     input_file: str
     output_file: Optional[str] = None
     error_message: Optional[str] = None
+    worker_id: Optional[str] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

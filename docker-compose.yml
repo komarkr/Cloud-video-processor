@@ -64,6 +64,23 @@ services:
       redis:
         condition: service_started
 
+  worker:
+    build: ./backend
+    command: celery -A worker.app worker --concurrency=1 --loglevel=info
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - media:/data
+    cpus: "2"
+    labels:
+      - "cvp.role=worker"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
   nginx:
     image: nginx:alpine
     ports:

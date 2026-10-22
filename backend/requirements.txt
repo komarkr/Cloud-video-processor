@@ -10,3 +10,4 @@ pyjwt
 pytest
 pydantic-settings
 email-validator
+celery

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -5,6 +6,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+import redis
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -39,7 +41,8 @@ async def create_task(
     4. Check user active tasks limit (<= 5).
     5. Check global queue capacity (<= MAX_QUEUE).
     6. Save task record with status 'queued'.
-    7. Clean up temporary file on any error (422/429/503).
+    7. Dispatch Celery task: process_task.delay(task_id).
+    8. Clean up temporary file on any validation error (422/429/503).
     """
     os.makedirs(settings.upload_dir, exist_ok=True)
 
@@ -154,7 +157,81 @@ async def create_task(
     db.commit()
     db.refresh(new_task)
 
+    # Dispatch Celery worker task asynchronously
+    try:
+        from worker.tasks import process_task
+        process_task.delay(str(new_task.id))
+    except Exception as e:
+        logger.warning("Could not dispatch Celery task %s to queue: %s", new_task.id, e)
+
     return new_task
+
+
+@router.post(
+    "/{task_id}/cancel",
+    summary="Cancel a queued or running task",
+)
+def cancel_task(
+    task_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cancel processing task:
+    - If status == 'queued': immediately transition to 'cancelled' in DB and Redis.
+    - If status == 'running': set cancel:{task_id} in Redis to trigger cooperative cancellation.
+    - If already completed/cancelled/failed: return 400.
+    """
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    if task.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: you do not have permission to cancel this task",
+        )
+
+    if task.status in [TaskStatus.done, TaskStatus.failed, TaskStatus.cancelled]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel task with status '{task.status.value}'",
+        )
+
+    # Redis cancellation flag
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        r = None
+
+    if task.status == TaskStatus.queued:
+        now = datetime.now(timezone.utc)
+        task.status = TaskStatus.cancelled
+        task.error_message = "Task cancelled by user before processing"
+        task.finished_at = now
+        db.commit()
+
+        if r:
+            try:
+                r.set(f"cancel:{task_id}", 1, ex=3600)
+                r.hset(f"task:{task_id}", mapping={"status": "cancelled", "finished_at": str(now)})
+            except Exception as e:
+                logger.warning("Redis operation failed: %s", e)
+
+        return {"status": "ok", "message": "Queued task was immediately cancelled", "task_id": str(task_id)}
+
+    elif task.status == TaskStatus.running:
+        if r:
+            try:
+                r.set(f"cancel:{task_id}", 1, ex=3600)
+                r.hset(f"task:{task_id}", mapping={"cancellation_requested": "true"})
+            except Exception as e:
+                logger.warning("Redis operation failed: %s", e)
+
+        return {"status": "ok", "message": "Cancellation request submitted for running task", "task_id": str(task_id)}
 
 
 @router.get(

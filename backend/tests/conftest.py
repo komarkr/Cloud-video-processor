@@ -26,7 +26,6 @@ if not TEST_DATABASE_URL:
     pg_password = os.getenv("DB_PASSWORD", "my_secret_password")
     pg_url = f"postgresql+psycopg://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{TEST_DB_NAME}"
 
-    # Try connecting to PostgreSQL and creating cvp_test database if needed
     try:
         import psycopg
         with psycopg.connect(
@@ -44,12 +43,66 @@ if not TEST_DATABASE_URL:
                     cur.execute(f"CREATE DATABASE {TEST_DB_NAME}")
         TEST_DATABASE_URL = pg_url
     except Exception:
-        # Fallback to isolated test database file
         TEST_DATABASE_URL = "sqlite:///./cvp_test.db"
 
 connect_args = {"check_same_thread": False} if "sqlite" in TEST_DATABASE_URL else {}
 test_engine = create_engine(TEST_DATABASE_URL, connect_args=connect_args)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+
+class FakeRedis:
+    """In-memory Redis implementation for unit testing."""
+    def __init__(self, *args, **kwargs):
+        self._data = {}
+
+    def set(self, key, value, ex=None):
+        self._data[str(key)] = str(value)
+        return True
+
+    def get(self, key):
+        return self._data.get(str(key))
+
+    def exists(self, key):
+        return 1 if str(key) in self._data else 0
+
+    def hset(self, name, key=None, value=None, mapping=None):
+        name_str = str(name)
+        if name_str not in self._data or not isinstance(self._data[name_str], dict):
+            self._data[name_str] = {}
+        if mapping:
+            for k, v in mapping.items():
+                self._data[name_str][str(k)] = str(v)
+        if key is not None and value is not None:
+            self._data[name_str][str(key)] = str(value)
+        return True
+
+    def hget(self, name, key):
+        return self._data.get(str(name), {}).get(str(key))
+
+    def hgetall(self, name):
+        return self._data.get(str(name), {})
+
+    def flushall(self):
+        self._data.clear()
+
+
+_global_fake_redis = FakeRedis()
+
+
+@pytest.fixture(autouse=True)
+def setup_mock_redis(monkeypatch):
+    """Automatically provide FakeRedis if real Redis is unreachable."""
+    try:
+        import redis
+        real_r = redis.Redis.from_url(settings.redis_url, socket_timeout=0.5)
+        real_r.ping()
+    except Exception:
+        import redis
+        monkeypatch.setattr(redis.Redis, "from_url", lambda *args, **kwargs: _global_fake_redis)
+
+    import worker.tasks
+    monkeypatch.setattr(worker.tasks, "SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr(worker.tasks.process_task, "delay", lambda *args, **kwargs: None)
 
 
 @pytest.fixture(scope="session", autouse=True)

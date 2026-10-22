@@ -7,6 +7,7 @@ import shutil
 import socket
 import subprocess
 import time
+from typing import Optional
 import uuid
 
 import redis
@@ -74,6 +75,25 @@ def get_ffmpeg_executable() -> str:
     return "ffmpeg"
 
 
+def parse_ffmpeg_progress_line(line: str, total_sec: float) -> Optional[int]:
+    """
+    Parses a single FFmpeg -progress line (e.g. 'out_time_us=5000000').
+    Returns an integer percentage in range [0, 99], or None if line is not a valid progress timestamp.
+    """
+    if not line or not line.startswith("out_time_us="):
+        return None
+    try:
+        parts = line.strip().split("=", 1)
+        if len(parts) == 2 and total_sec > 0:
+            val_str = parts[1].strip()
+            if val_str.isdigit():
+                pct = int(int(val_str) / 1e6 / total_sec * 100)
+                return max(0, min(99, pct))
+    except Exception:
+        pass
+    return None
+
+
 def run_ffmpeg(task_id: str, args: list[str], total_sec: float, r: redis.Redis) -> None:
     """Execute FFmpeg with live progress parsing and cooperative cancellation checking."""
     os.makedirs(settings.log_dir, exist_ok=True)
@@ -95,14 +115,12 @@ def run_ffmpeg(task_id: str, args: list[str], total_sec: float, r: redis.Redis) 
 
         if proc.stdout:
             for line in proc.stdout:
-                if line.startswith("out_time_us="):
-                    v = line.split("=")[1].strip()
-                    if v.isdigit() and total_sec > 0:
-                        pct = min(99, int(int(v) / 1e6 / total_sec * 100))
-                        try:
-                            r.hset(f"task:{task_id}", "progress", pct)
-                        except Exception:
-                            pass
+                pct = parse_ffmpeg_progress_line(line, total_sec)
+                if pct is not None:
+                    try:
+                        r.hset(f"task:{task_id}", "progress", pct)
+                    except Exception:
+                        pass
 
                 now = time.time()
                 if now - last_check > 0.5:

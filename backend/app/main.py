@@ -8,6 +8,7 @@ from app.models import User
 from app.routers.auth import router as auth_router
 from app.routers.tasks import router as tasks_router
 from app.routers.autoscaler import router as autoscaler_router
+from app.routers.admin import router as admin_router
 from app.services.security import hash_password
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ async def add_x_served_by_header(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(autoscaler_router)
+app.include_router(admin_router)
 
 
 @app.get("/api/health")

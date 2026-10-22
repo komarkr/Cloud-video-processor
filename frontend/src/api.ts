@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { User, Task } from './types';
+import type { User, Task, AdminOverview } from './types';
 
 export const api = axios.create({
   baseURL: '',
@@ -64,5 +64,15 @@ export const tasksApi = {
   },
   getDownloadUrl(id: string): string {
     return `/api/tasks/${id}/download`;
+  },
+};
+
+export const adminApi = {
+  async getOverview(): Promise<AdminOverview> {
+    const res = await api.get('/api/admin/overview');
+    return res.data;
+  },
+  async cancelTask(id: string): Promise<void> {
+    await api.post(`/api/admin/tasks/${id}/cancel`);
   },
 };

@@ -43,3 +43,54 @@ export const formatQueueInfo = (position?: number | null, etaSec?: number | null
   return `У черзі, ${posPart}, приблизно ${etaPart}`;
 };
 
+export interface StatusCounts {
+  queued: number;
+  running: number;
+  done: number;
+  failed: number;
+  cancelled: number;
+  total: number;
+}
+
+export interface AdminWorker {
+  hostname: string;
+  cpu: number;
+  ram: number;
+  current_task?: string | null;
+  last_seen: string;
+  timestamp?: string | null;
+}
+
+export interface AdminTask {
+  id: string;
+  user_email: string;
+  operation_type: string;
+  status: TaskStatus;
+  progress: number;
+  worker_id?: string | null;
+  duration_sec?: number | null;
+  duration_text?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error_message?: string | null;
+}
+
+export interface AutoscalerEvent {
+  action: string;
+  workers: number;
+  queued?: number;
+  timestamp: string;
+}
+
+export interface AdminOverview {
+  status: string;
+  status_counts: StatusCounts;
+  queue_length: number;
+  active_workers_count: number;
+  workers: AdminWorker[];
+  recent_tasks: AdminTask[];
+  autoscaler_events: AutoscalerEvent[];
+}
+
+

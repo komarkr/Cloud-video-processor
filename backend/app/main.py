@@ -6,6 +6,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.models import User
 from app.routers.auth import router as auth_router
+from app.routers.tasks import router as tasks_router
 from app.services.security import hash_password
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ async def add_x_served_by_header(request: Request, call_next):
 
 # Register routers
 app.include_router(auth_router)
+app.include_router(tasks_router)
 
 
 @app.get("/api/health")

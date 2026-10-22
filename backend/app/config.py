@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,9 @@ class Settings(BaseSettings):
     max_history: int = 20
     max_queue: int = 100
     result_lifetime_hours: int = 24
+
+    # Storage paths
+    upload_dir: str = "/data/uploads" if os.name != "nt" else os.path.abspath("data/uploads")
 
     model_config = SettingsConfigDict(
         env_file=".env",

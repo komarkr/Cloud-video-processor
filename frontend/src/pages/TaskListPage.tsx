@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { tasksApi } from '../api';
 import type { Task } from '../types';
+import { TaskDetailModal } from '../components/TaskDetailModal';
 
 interface TaskListPageProps {
   onGoToNewTask: () => void;
@@ -10,13 +11,27 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const activeSseMap = useRef<Map<string, EventSource>>(new Map());
 
   const fetchTasks = async () => {
     try {
       setError(null);
       const data = await tasksApi.list();
-      setTasks(data);
+      setTasks((prev) => {
+        return data.map((d) => {
+          const existing = prev.find((p) => p.id === d.id);
+          return {
+            ...d,
+            progress:
+              existing?.progress !== undefined
+                ? existing.progress
+                : d.status === 'done'
+                ? 100
+                : 0,
+          };
+        });
+      });
     } catch (err: any) {
       setError('Не вдалося завантажити список задач.');
     } finally {
@@ -26,30 +41,39 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
 
   useEffect(() => {
     fetchTasks();
+
+    // Polling fallback every 2 seconds for active tasks
     const interval = setInterval(() => {
-      // Periodic background refresh for queued/running tasks
-      tasksApi.list().then((updated) => {
-        setTasks((prev) => {
-          return updated.map((u) => {
-            const existing = prev.find((p) => p.id === u.id);
-            return {
-              ...u,
-              progress: existing?.progress !== undefined ? existing.progress : (u.status === 'done' ? 100 : 0),
-            };
+      tasksApi
+        .list()
+        .then((updated) => {
+          setTasks((prev) => {
+            return updated.map((u) => {
+              const existing = prev.find((p) => p.id === u.id);
+              return {
+                ...u,
+                progress:
+                  existing?.progress !== undefined
+                    ? existing.progress
+                    : u.status === 'done'
+                    ? 100
+                    : 0,
+              };
+            });
           });
-        });
-      }).catch(() => {});
-    }, 3000);
+        })
+        .catch(() => {});
+    }, 2000);
 
     return () => {
       clearInterval(interval);
-      // Close any open SSE connections
+      // Close all active SSE connections on unmount
       activeSseMap.current.forEach((es) => es.close());
       activeSseMap.current.clear();
     };
   }, []);
 
-  // Set up live SSE streams for running / queued tasks
+  // Set up live SSE streams for queued and running tasks
   useEffect(() => {
     const activeTasks = tasks.filter((t) => t.status === 'queued' || t.status === 'running');
 
@@ -65,11 +89,16 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
               setTasks((prevTasks) =>
                 prevTasks.map((t) => {
                   if (t.id === task.id) {
-                    return {
+                    const updated = {
                       ...t,
                       status: payload.status,
                       progress: payload.progress !== undefined ? payload.progress : t.progress,
                     };
+                    // Keep modal in sync if open
+                    if (selectedTask && selectedTask.id === task.id) {
+                      setSelectedTask(updated);
+                    }
+                    return updated;
                   }
                   return t;
                 })
@@ -78,9 +107,14 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
               if (payload.status === 'done' || payload.status === 'failed' || payload.status === 'cancelled') {
                 es.close();
                 activeSseMap.current.delete(task.id);
-                // Refresh full task record to get output_file and finished_at
+                // Refresh task record for output_file, finished_at, error_message
                 tasksApi.get(task.id).then((fresh) => {
-                  setTasks((curr) => curr.map((c) => (c.id === task.id ? { ...fresh, progress: 100 } : c)));
+                  setTasks((curr) =>
+                    curr.map((c) => (c.id === task.id ? { ...fresh, progress: 100 } : c))
+                  );
+                  if (selectedTask && selectedTask.id === task.id) {
+                    setSelectedTask({ ...fresh, progress: 100 });
+                  }
                 });
               }
             } catch (e) {
@@ -97,7 +131,7 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
         }
       }
     });
-  }, [tasks]);
+  }, [tasks, selectedTask]);
 
   const handleCancel = async (id: string) => {
     try {
@@ -113,13 +147,15 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
       return;
     }
     try {
-      // Close SSE if active
       if (activeSseMap.current.has(id)) {
         activeSseMap.current.get(id)?.close();
         activeSseMap.current.delete(id);
       }
       await tasksApi.delete(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
+      if (selectedTask && selectedTask.id === id) {
+        setSelectedTask(null);
+      }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Не вдалося видалити задачу.');
     }
@@ -143,8 +179,11 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
-        ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return (
+        d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
+        ' ' +
+        d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+      );
     } catch {
       return dateStr;
     }
@@ -156,7 +195,7 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
         <div>
           <h2>Мої задачі</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 0 }}>
-            Відстежуйте стан, прогрес обробки та завантажуйте готові файли.
+            Відстежуйте стан, прогрес обробки у реальному часі та переглядайте результат.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -224,15 +263,19 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                     </td>
                     <td>
                       <span className={`status-badge ${task.status}`}>
-                        {task.status === 'queued' && '⏳ В черзі'}
-                        {task.status === 'running' && '⚙️ Обробка'}
+                        {task.status === 'queued' && '⏳ У черзі'}
+                        {task.status === 'running' && '⚙️ Виконується'}
                         {task.status === 'done' && '✅ Готово'}
                         {task.status === 'failed' && '❌ Помилка'}
                         {task.status === 'cancelled' && '🚫 Скасовано'}
                       </span>
                       {task.error_message && (
-                        <div style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '0.2rem', maxWidth: '200px' }} title={task.error_message}>
-                          {task.error_message.slice(0, 60)}...
+                        <div
+                          style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '0.2rem', maxWidth: '180px', cursor: 'pointer' }}
+                          title={task.error_message}
+                          onClick={() => setSelectedTask(task)}
+                        >
+                          {task.error_message.slice(0, 45)}... (деталі)
                         </div>
                       )}
                     </td>
@@ -244,6 +287,17 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div className="action-btn-group" style={{ justifyContent: 'flex-end' }}>
+                        {/* Details / Preview modal button */}
+                        <button
+                          type="button"
+                          className="action-btn"
+                          style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+                          onClick={() => setSelectedTask(task)}
+                          title="Переглянути деталі та медіа"
+                        >
+                          {task.status === 'done' ? '👁️ Перегляд' : 'ℹ️ Деталі'}
+                        </button>
+
                         {/* Download button for completed task */}
                         {task.status === 'done' && (
                           <a
@@ -285,6 +339,16 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
             </tbody>
           </table>
         </article>
+      )}
+
+      {/* Task Details & Video Preview Modal */}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onCancel={handleCancel}
+          onDelete={handleDelete}
+        />
       )}
     </div>
   );

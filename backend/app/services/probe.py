@@ -71,6 +71,8 @@ def probe_video(file_path: str) -> VideoProbeResult:
     ffprobe_bin = get_ffprobe_executable()
     cmd = [
         ffprobe_bin,
+        "-protocol_whitelist",
+        "file",
         "-v",
         "quiet",
         "-print_format",

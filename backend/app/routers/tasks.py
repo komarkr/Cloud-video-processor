@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import os
+import shutil
 import uuid
 from typing import List, Optional
 
@@ -69,13 +70,22 @@ async def create_task(
     """
     os.makedirs(settings.upload_dir, exist_ok=True)
 
-    task_id = uuid.uuid4()
-    original_filename = file.filename or "upload.mp4"
-    _, ext = os.path.splitext(original_filename)
-    if not ext:
-        ext = ".mp4"
+    # Check available storage space (minimum 50 MB required)
+    disk_usage = shutil.disk_usage(settings.upload_dir)
+    if disk_usage.free < 50 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+            detail="Server storage is full. Please try again later.",
+        )
 
-    file_path = os.path.join(settings.upload_dir, f"{task_id}{ext}")
+    task_id = uuid.uuid4()
+    original_filename = os.path.basename(file.filename or "upload.mp4")
+    _, raw_ext = os.path.splitext(original_filename)
+    safe_ext = raw_ext.lower()
+    if safe_ext not in [".mp4", ".mov", ".mkv", ".webm", ".avi"]:
+        safe_ext = ".mp4"
+
+    file_path = os.path.join(settings.upload_dir, f"{task_id}{safe_ext}")
     logo_file_path: Optional[str] = None
     max_bytes = settings.max_file_mb * 1024 * 1024
     total_bytes = 0

@@ -132,12 +132,14 @@ def run_ffmpeg(task_id: str, args: list[str], total_sec: float, r: redis.Redis) 
 
 
 def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
-    """Build FFmpeg command line arguments based on operation_type and params."""
+    """Build FFmpeg command line arguments based on operation_type and params with strict protocol whitelist."""
     op = (task.operation_type or "convert").lower()
     params = task.params or {}
 
     if op == "convert":
         return [
+            "-protocol_whitelist",
+            "file",
             "-i",
             task.input_file,
             "-c:v",
@@ -161,6 +163,8 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
         crf = SCALE_CRF_TABLE.get(height, 23)
 
         return [
+            "-protocol_whitelist",
+            "file",
             "-i",
             task.input_file,
             "-vf",
@@ -191,8 +195,12 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             filter_complex = f"[0:v][1:v]overlay={pos_expr}"
 
         return [
+            "-protocol_whitelist",
+            "file",
             "-i",
             task.input_file,
+            "-protocol_whitelist",
+            "file",
             "-i",
             logo_path,
             "-filter_complex",
@@ -213,6 +221,8 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
         if action in ["mute", "remove"] or op in ["mute", "mute_audio", "remove_audio"]:
             # Mute audio, copy video stream
             return [
+                "-protocol_whitelist",
+                "file",
                 "-i",
                 task.input_file,
                 "-an",
@@ -223,6 +233,8 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
         else:
             # Extract audio to MP3 using libmp3lame
             return [
+                "-protocol_whitelist",
+                "file",
                 "-i",
                 task.input_file,
                 "-vn",
@@ -236,6 +248,8 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
     else:
         # Default convert operation
         return [
+            "-protocol_whitelist",
+            "file",
             "-i",
             task.input_file,
             "-c:v",
@@ -256,10 +270,11 @@ def process_task(task_id: str):
     Celery task that executes video processing:
     1. If cancelled in DB/Redis, exit immediately.
     2. Set state 'running', started_at, worker_id (hostname) in DB and Redis task:{id}.
-    3. Build operation arguments and run FFmpeg with live progress tracking.
-    4. On success: set status 'done', output_file, finished_at, expires_at.
-    5. On Cancelled: delete partial file and set status 'cancelled'.
-    6. On error: set status 'failed', error_message.
+    3. Check disk space availability.
+    4. Build operation arguments and run FFmpeg with live progress tracking.
+    5. On success: set status 'done', output_file, finished_at, expires_at.
+    6. On Cancelled: delete partial file and set status 'cancelled'.
+    7. On error: set status 'failed', error_message.
     """
     task_uuid = uuid.UUID(task_id)
     set_current_task(task_id)
@@ -271,7 +286,7 @@ def process_task(task_id: str):
     try:
         task = db.query(Task).filter(Task.id == task_uuid).first()
         if not task:
-            logger.error("Task %s not found in database.", task_id)
+            logger.error("[worker_id=%s task_id=%s] Task not found in database.", worker_id, task_id)
             return
 
         ext = get_output_extension(task)
@@ -283,7 +298,13 @@ def process_task(task_id: str):
             task.finished_at = datetime.now(timezone.utc)
             db.commit()
             r.hset(f"task:{task_id}", mapping={"status": "cancelled"})
+            logger.info("[worker_id=%s task_id=%s] Task was cancelled before processing.", worker_id, task_id)
             return
+
+        # Check available disk storage
+        disk_info = shutil.disk_usage(settings.output_dir)
+        if disk_info.free < 50 * 1024 * 1024:  # At least 50 MB required
+            raise RuntimeError("Insufficient server disk space for processing.")
 
         # Transition to running
         started_at = datetime.now(timezone.utc)
@@ -306,6 +327,13 @@ def process_task(task_id: str):
         except Exception:
             pass
 
+        logger.info(
+            "[worker_id=%s task_id=%s] Starting processing (operation: %s)",
+            worker_id,
+            task_id,
+            task.operation_type,
+        )
+
         # Get video duration for progress calculation
         total_sec = 1.0
         try:
@@ -315,7 +343,7 @@ def process_task(task_id: str):
                 task.duration_sec = total_sec
                 db.commit()
         except Exception as e:
-            logger.warning("Could not probe video duration for task %s: %s", task_id, e)
+            logger.warning("[worker_id=%s task_id=%s] Could not probe video duration: %s", worker_id, task_id, e)
 
         # Verify audio stream exists if operation is audio extraction
         op = (task.operation_type or "convert").lower()
@@ -354,10 +382,16 @@ def process_task(task_id: str):
                 "expires_at": str(expires_at),
             },
         )
-        logger.info("Task %s completed successfully.", task_id)
+        duration = (finished_at - started_at).total_seconds()
+        logger.info(
+            "[worker_id=%s task_id=%s] Task completed successfully in %.2fs.",
+            worker_id,
+            task_id,
+            duration,
+        )
 
     except Cancelled:
-        logger.info("Task %s was cancelled by user.", task_id)
+        logger.info("[worker_id=%s task_id=%s] Task was cancelled by user.", worker_id, task_id)
         if os.path.exists(output_path):
             try:
                 os.remove(output_path)
@@ -376,7 +410,7 @@ def process_task(task_id: str):
         )
 
     except Exception as e:
-        logger.error("Task %s failed: %s", task_id, e)
+        logger.error("[worker_id=%s task_id=%s] Task failed: %s", worker_id, task_id, e)
         task.status = TaskStatus.failed
         task.error_message = str(e)
         task.finished_at = datetime.now(timezone.utc)
@@ -393,3 +427,23 @@ def process_task(task_id: str):
     finally:
         set_current_task(None)
         db.close()
+
+
+@celery_app.task(name="worker.cleanup_expired_tasks")
+def celery_cleanup_expired_tasks() -> int:
+    """Periodic Celery task to clean up expired tasks and their files."""
+    from app.services.cleanup import cleanup_expired_tasks
+    db = SessionLocal()
+    r = None
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        pass
+    try:
+        purged = cleanup_expired_tasks(db, r)
+        worker_id = socket.gethostname()
+        logger.info("[worker_id=%s] Periodic cleanup finished, purged %d tasks.", worker_id, purged)
+        return purged
+    finally:
+        db.close()
+

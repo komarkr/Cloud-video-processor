@@ -1,6 +1,8 @@
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI, Request
+import redis
 
 from app.config import settings
 from app.db import SessionLocal
@@ -9,6 +11,7 @@ from app.routers.auth import router as auth_router
 from app.routers.tasks import router as tasks_router
 from app.routers.autoscaler import router as autoscaler_router
 from app.routers.admin import router as admin_router
+from app.services.cleanup import cleanup_expired_tasks
 from app.services.security import hash_password
 
 logger = logging.getLogger(__name__)
@@ -37,10 +40,46 @@ def init_admin():
         db.close()
 
 
+def run_cleanup_job():
+    """Execute cleanup of expired tasks in a background thread."""
+    db = SessionLocal()
+    r = None
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        pass
+    try:
+        purged = cleanup_expired_tasks(db, r)
+        if purged > 0:
+            logger.info("[cleanup] Purged %d expired tasks on schedule.", purged)
+    except Exception as e:
+        logger.warning("Error during periodic expired task cleanup: %s", e)
+    finally:
+        db.close()
+
+
+async def periodic_cleanup_loop():
+    """Background task running every 10 minutes (600s) to delete expired tasks and files."""
+    while True:
+        try:
+            await asyncio.sleep(600)
+            await asyncio.to_thread(run_cleanup_job)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Unexpected error in periodic cleanup loop: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_admin()
+    cleanup_task = asyncio.create_task(periodic_cleanup_loop())
     yield
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(

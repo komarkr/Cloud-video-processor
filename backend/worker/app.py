@@ -20,6 +20,12 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    beat_schedule={
+        "cleanup-expired-tasks-every-10-mins": {
+            "task": "worker.cleanup_expired_tasks",
+            "schedule": 600.0,
+        },
+    },
 )
 
 app = celery_app  # Alias for `celery -A worker.app worker`

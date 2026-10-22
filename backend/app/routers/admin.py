@@ -233,3 +233,27 @@ def admin_cancel_task(
                 pass
 
         return {"status": "ok", "message": "Cancellation request submitted by admin for running task", "task_id": str(task_id)}
+
+
+@router.post(
+    "/cleanup",
+    summary="Trigger immediate cleanup of expired tasks and their files",
+)
+def trigger_admin_cleanup(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Manually invoke cleanup of expired tasks and return count of purged tasks."""
+    from app.services.cleanup import cleanup_expired_tasks
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        r = None
+
+    purged = cleanup_expired_tasks(db, r)
+    return {
+        "status": "ok",
+        "message": f"Successfully purged {purged} expired tasks.",
+        "purged_count": purged,
+    }
+

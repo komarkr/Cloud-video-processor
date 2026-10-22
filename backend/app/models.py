@@ -1,7 +1,7 @@
 import enum
 import uuid
 import sqlalchemy as sa
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 from app.db import Base
@@ -55,6 +55,7 @@ class Task(Base):
     params = Column(JSONB().with_variant(sa.JSON(), "sqlite"), nullable=True)
     input_file = Column(String, nullable=False)
     output_file = Column(String, nullable=True)
+    duration_sec = Column(Float, nullable=True, default=0.0)
     error_message = Column(Text, nullable=True)
     worker_id = Column(String, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)

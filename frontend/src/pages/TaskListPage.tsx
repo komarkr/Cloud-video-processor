@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { tasksApi } from '../api';
 import type { Task } from '../types';
+import { formatEta, formatQueueInfo } from '../types';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 
 interface TaskListPageProps {
@@ -93,6 +94,8 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                       ...t,
                       status: payload.status,
                       progress: payload.progress !== undefined ? payload.progress : t.progress,
+                      queue_position: payload.queue_position !== undefined ? payload.queue_position : t.queue_position,
+                      eta_sec: payload.eta_sec !== undefined ? payload.eta_sec : t.eta_sec,
                     };
                     // Keep modal in sync if open
                     if (selectedTask && selectedTask.id === task.id) {
@@ -263,12 +266,21 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                     </td>
                     <td>
                       <span className={`status-badge ${task.status}`}>
-                        {task.status === 'queued' && '⏳ У черзі'}
+                        {task.status === 'queued' && (
+                          task.queue_position
+                            ? `⏳ ${formatQueueInfo(task.queue_position, task.eta_sec)}`
+                            : '⏳ У черзі'
+                        )}
                         {task.status === 'running' && '⚙️ Виконується'}
                         {task.status === 'done' && '✅ Готово'}
                         {task.status === 'failed' && '❌ Помилка'}
                         {task.status === 'cancelled' && '🚫 Скасовано'}
                       </span>
+                      {task.status === 'queued' && task.queue_position && (
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                          Місце #{task.queue_position} • ETA: {formatEta(task.eta_sec)}
+                        </div>
+                      )}
                       {task.error_message && (
                         <div
                           style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '0.2rem', maxWidth: '180px', cursor: 'pointer' }}

@@ -46,6 +46,7 @@ def upgrade() -> None:
         sa.Column('params', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('input_file', sa.String(), nullable=False),
         sa.Column('output_file', sa.String(), nullable=True),
+        sa.Column('duration_sec', sa.Float(), nullable=True),
         sa.Column('error_message', sa.Text(), nullable=True),
         sa.Column('worker_id', sa.String(), nullable=True),
         sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),

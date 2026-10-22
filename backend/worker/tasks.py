@@ -107,6 +107,8 @@ def run_ffmpeg(task_id: str, args: list[str], total_sec: float, r: redis.Redis) 
                 if now - last_check > 0.5:
                     last_check = now
                     try:
+                        worker_id = socket.gethostname()
+                        r.set(f"worker:heartbeat:{worker_id}", 1, ex=60)
                         if r.exists(f"cancel:{task_id}"):
                             proc.terminate()
                             try:
@@ -297,12 +299,19 @@ def process_task(task_id: str):
                 "started_at": str(started_at),
             },
         )
+        try:
+            r.set(f"worker:heartbeat:{worker_id}", 1, ex=60)
+        except Exception:
+            pass
 
         # Get video duration for progress calculation
         total_sec = 1.0
         try:
             probe_res = probe_video(task.input_file)
             total_sec = max(0.1, probe_res.duration)
+            if not task.duration_sec or task.duration_sec <= 0:
+                task.duration_sec = total_sec
+                db.commit()
         except Exception as e:
             logger.warning("Could not probe video duration for task %s: %s", task_id, e)
 

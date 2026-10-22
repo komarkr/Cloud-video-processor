@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Task } from '../types';
+import { formatEta, formatQueueInfo } from '../types';
 import { tasksApi } from '../api';
 
 interface TaskDetailModalProps {
@@ -69,10 +70,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         </header>
 
         {/* Status Badge */}
-        <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <strong>Статус:</strong>
           <span className={`status-badge ${task.status}`}>
-            {task.status === 'queued' && '⏳ У черзі'}
+            {task.status === 'queued' && (
+              task.queue_position
+                ? `⏳ ${formatQueueInfo(task.queue_position, task.eta_sec)}`
+                : '⏳ У черзі'
+            )}
             {task.status === 'running' && '⚙️ Виконується'}
             {task.status === 'done' && '✅ Готово'}
             {task.status === 'failed' && '❌ Помилка'}
@@ -84,6 +89,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </span>
           )}
         </div>
+
+        {/* Queued notification banner */}
+        {task.status === 'queued' && (
+          <div className="file-meta-box" style={{ marginBottom: '1.25rem', borderColor: 'rgba(56, 189, 248, 0.4)' }}>
+            <h4 style={{ color: '#38bdf8', fontSize: '0.95rem', margin: '0 0 0.4rem' }}>
+              ℹ️ Статус очікування черги:
+            </h4>
+            <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 500 }}>
+              {formatQueueInfo(task.queue_position, task.eta_sec)}
+            </div>
+            {task.eta_sec !== undefined && task.eta_sec !== null && (
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                Орієнтовний розрахунковий час очікування: {task.eta_sec} с
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Error message box if failed */}
         {task.status === 'failed' && task.error_message && (
@@ -143,6 +165,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <span>Створено:</span>
             <strong>{formatDate(task.created_at)}</strong>
           </div>
+          {task.queue_position && (
+            <div className="meta-row">
+              <span>Місце у черзі:</span>
+              <strong style={{ color: '#38bdf8' }}>#{task.queue_position}</strong>
+            </div>
+          )}
+          {task.eta_sec !== undefined && task.eta_sec !== null && (
+            <div className="meta-row">
+              <span>Орієнтовне очікування (ETA):</span>
+              <strong style={{ color: '#38bdf8' }}>{formatEta(task.eta_sec)} ({task.eta_sec} с)</strong>
+            </div>
+          )}
           {task.started_at && (
             <div className="meta-row">
               <span>Початок обробки:</span>

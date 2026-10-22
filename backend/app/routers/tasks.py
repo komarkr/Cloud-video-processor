@@ -19,6 +19,7 @@ from app.models import Task, TaskStatus, User
 from app.routers.deps import get_current_user
 from app.schemas import TaskOut
 from app.services.probe import VideoValidationError, probe_video
+from app.services.estimation import enrich_task_out, estimate_wait_sec, get_queue_position
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,9 @@ async def create_task(
         )
 
     # Validate file with ffprobe
+    probe_res = None
     try:
-        probe_video(file_path)
+        probe_res = probe_video(file_path)
     except VideoValidationError as e:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -155,6 +157,7 @@ async def create_task(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Server queue is at maximum capacity. Please try again later.",
+            headers={"Retry-After": "30"},
         )
 
     # Parse optional JSON parameters
@@ -282,6 +285,7 @@ async def create_task(
         params=parsed_params if parsed_params else None,
         input_file=file_path,
         output_file=None,
+        duration_sec=float(probe_res.duration) if probe_res and probe_res.duration else 0.0,
         error_message=None,
     )
     db.add(new_task)
@@ -294,6 +298,12 @@ async def create_task(
         process_task.delay(str(new_task.id))
     except Exception as e:
         logger.warning("Could not dispatch Celery task %s to queue: %s", new_task.id, e)
+
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        r = None
+    enrich_task_out(new_task, db, r)
 
     return new_task
 
@@ -321,6 +331,12 @@ async def events(
         except Exception:
             r = None
 
+        sync_r = None
+        try:
+            sync_r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+        except Exception:
+            pass
+
         while True:
             h = {}
             if r:
@@ -347,7 +363,18 @@ async def events(
                 except (ValueError, TypeError):
                     progress = 100 if status_val == "done" else 0
 
-            yield f"data: {json.dumps({'status': status_val, 'progress': progress})}\n\n"
+            payload = {"status": status_val, "progress": progress}
+            if status_val == "queued":
+                try:
+                    db.expire_all()
+                    t = db.query(Task).filter(Task.id == task_id).first()
+                    if t:
+                        payload["queue_position"] = get_queue_position(db, t)
+                        payload["eta_sec"] = estimate_wait_sec(db, sync_r, t)
+                except Exception as ex:
+                    logger.warning("Could not compute queue ETA for task %s: %s", task_id, ex)
+
+            yield f"data: {json.dumps(payload)}\n\n"
             if status_val in ("done", "failed", "cancelled"):
                 break
             await asyncio.sleep(1)
@@ -576,6 +603,14 @@ def get_my_tasks(
         .order_by(Task.created_at.desc())
         .all()
     )
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        r = None
+
+    for t in tasks:
+        enrich_task_out(t, db, r)
+
     return tasks
 
 
@@ -603,4 +638,10 @@ def get_task_by_id(
             detail="Access forbidden: you do not have permission to view this task",
         )
 
+    try:
+        r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        r = None
+
+    enrich_task_out(task, db, r)
     return task

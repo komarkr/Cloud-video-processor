@@ -82,6 +82,10 @@ class FakeRedis:
     def hgetall(self, name):
         return self._data.get(str(name), {})
 
+    def keys(self, pattern="*"):
+        import fnmatch
+        return [k for k in self._data.keys() if fnmatch.fnmatch(k, pattern)]
+
     def delete(self, *keys):
         count = 0
         for k in keys:

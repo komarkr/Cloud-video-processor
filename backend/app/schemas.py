@@ -37,6 +37,9 @@ class TaskOut(BaseModel):
     params: Optional[Dict[str, Any]] = None
     input_file: str
     output_file: Optional[str] = None
+    duration_sec: Optional[float] = None
+    queue_position: Optional[int] = None
+    eta_sec: Optional[int] = None
     error_message: Optional[str] = None
     worker_id: Optional[str] = None
     started_at: Optional[datetime] = None

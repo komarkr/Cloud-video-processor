@@ -12,3 +12,5 @@ pydantic-settings
 email-validator
 celery
 pillow
+psutil
+docker

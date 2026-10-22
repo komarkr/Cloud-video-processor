@@ -15,6 +15,7 @@ from app.db import SessionLocal
 from app.models import Task, TaskStatus
 from app.services.probe import get_ffprobe_executable, probe_video
 from worker.app import celery_app
+from worker.heartbeat import set_current_task
 
 logger = logging.getLogger(__name__)
 
@@ -261,6 +262,7 @@ def process_task(task_id: str):
     6. On error: set status 'failed', error_message.
     """
     task_uuid = uuid.UUID(task_id)
+    set_current_task(task_id)
     r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     db = SessionLocal()
     worker_id = socket.gethostname()
@@ -389,4 +391,5 @@ def process_task(task_id: str):
         )
 
     finally:
+        set_current_task(None)
         db.close()

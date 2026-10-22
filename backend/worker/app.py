@@ -5,7 +5,7 @@ celery_app = Celery(
     "worker",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["worker.tasks"],
+    include=["worker.tasks", "worker.heartbeat"],
 )
 
 # Critical configurations for fair load balancing and fault tolerance

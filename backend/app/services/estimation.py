@@ -13,7 +13,12 @@ def alive_workers(r: Optional[redis.Redis] = None) -> int:
     """Determine the number of currently active/healthy workers."""
     if r:
         try:
-            # 1. Check Redis worker heartbeats
+            # 1. Check Redis worker heartbeats (hb:*)
+            hb_keys = r.keys("hb:*")
+            if hb_keys:
+                return len(hb_keys)
+
+            # 2. Check legacy heartbeat keys if any
             heartbeats = r.keys("worker:heartbeat:*")
             if heartbeats:
                 return len(heartbeats)

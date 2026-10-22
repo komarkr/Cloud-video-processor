@@ -94,6 +94,36 @@ class FakeRedis:
                 count += 1
         return count
 
+    def expire(self, key, seconds):
+        return True
+
+    def rpush(self, name, *values):
+        name_str = str(name)
+        if name_str not in self._data or not isinstance(self._data[name_str], list):
+            self._data[name_str] = []
+        for v in values:
+            self._data[name_str].append(str(v))
+        return len(self._data[name_str])
+
+    def lrange(self, name, start, end):
+        name_str = str(name)
+        lst = self._data.get(name_str, [])
+        if not isinstance(lst, list):
+            return []
+        if end == -1:
+            return lst[start:]
+        return lst[start : end + 1]
+
+    def ltrim(self, name, start, end):
+        name_str = str(name)
+        lst = self._data.get(name_str, [])
+        if isinstance(lst, list):
+            if end == -1:
+                self._data[name_str] = lst[start:]
+            else:
+                self._data[name_str] = lst[start : end + 1]
+        return True
+
     def flushall(self):
         self._data.clear()
 

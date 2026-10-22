@@ -81,6 +81,27 @@ services:
       redis:
         condition: service_started
 
+  autoscaler:
+    build: ./backend
+    command: python -m autoscaler.main
+    env_file:
+      - .env
+    environment:
+      - MIN_WORKERS=2
+      - MAX_WORKERS=4
+      - PER_WORKER=2
+      - IDLE_FOR=60
+      - DOCKER_NETWORK=cloud-video-processor_default
+      - MEDIA_VOLUME=cloud-video-processor_media
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
   nginx:
     image: nginx:alpine
     ports:

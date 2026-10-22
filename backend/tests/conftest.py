@@ -82,8 +82,43 @@ class FakeRedis:
     def hgetall(self, name):
         return self._data.get(str(name), {})
 
+    def delete(self, *keys):
+        count = 0
+        for k in keys:
+            if str(k) in self._data:
+                del self._data[str(k)]
+                count += 1
+        return count
+
     def flushall(self):
         self._data.clear()
+
+
+class FakeAsyncRedis:
+    """Async wrapper around FakeRedis for testing SSE and async endpoints."""
+    def __init__(self, sync_redis: FakeRedis):
+        self._sync = sync_redis
+
+    async def hgetall(self, name):
+        return self._sync.hgetall(name)
+
+    async def hset(self, name, key=None, value=None, mapping=None):
+        return self._sync.hset(name, key=key, value=value, mapping=mapping)
+
+    async def set(self, key, value, ex=None):
+        return self._sync.set(key, value, ex=ex)
+
+    async def get(self, key):
+        return self._sync.get(key)
+
+    async def exists(self, key):
+        return self._sync.exists(key)
+
+    async def delete(self, *keys):
+        return self._sync.delete(*keys)
+
+    async def aclose(self):
+        pass
 
 
 _global_fake_redis = FakeRedis()
@@ -98,7 +133,9 @@ def setup_mock_redis(monkeypatch):
         real_r.ping()
     except Exception:
         import redis
+        import redis.asyncio as aioredis
         monkeypatch.setattr(redis.Redis, "from_url", lambda *args, **kwargs: _global_fake_redis)
+        monkeypatch.setattr(aioredis, "from_url", lambda *args, **kwargs: FakeAsyncRedis(_global_fake_redis))
 
     import worker.tasks
     monkeypatch.setattr(worker.tasks, "SessionLocal", TestingSessionLocal)

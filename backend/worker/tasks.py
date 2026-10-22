@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 import os
@@ -17,6 +17,26 @@ from app.services.probe import get_ffprobe_executable, probe_video
 from worker.app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+WATERMARK_POSITIONS = {
+    "top_left": "10:10",
+    "top_right": "main_w-overlay_w-10:10",
+    "bottom_left": "10:main_h-overlay_h-10",
+    "bottom_right": "main_w-overlay_w-10:main_h-overlay_h-10",
+    "center": "(main_w-overlay_w)/2:(main_h-overlay_h)/2",
+}
+
+
+def get_output_extension(task: Task) -> str:
+    """Determine output file extension based on operation type and parameters."""
+    op = (task.operation_type or "").lower()
+    params = task.params or {}
+    if op in ["extract_audio", "extract"]:
+        return ".mp3"
+    if op == "audio" and params.get("action") not in ["mute", "remove"]:
+        return ".mp3"
+    return ".mp4"
 
 
 class Cancelled(Exception):
@@ -153,6 +173,63 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             output_path,
         ]
 
+    elif op == "watermark":
+        logo_path = params.get("logo_path")
+        pos_key = params.get("position", "bottom_right")
+        pos_expr = WATERMARK_POSITIONS.get(pos_key, WATERMARK_POSITIONS["bottom_right"])
+        try:
+            opacity = float(params.get("opacity", 1.0))
+        except (ValueError, TypeError):
+            opacity = 1.0
+
+        if 0.0 < opacity < 1.0:
+            filter_complex = f"[1:v]format=rgba,colorchannelmixer=aa={opacity}[wm];[0:v][wm]overlay={pos_expr}"
+        else:
+            filter_complex = f"[0:v][1:v]overlay={pos_expr}"
+
+        return [
+            "-i",
+            task.input_file,
+            "-i",
+            logo_path,
+            "-filter_complex",
+            filter_complex,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "23",
+            "-c:a",
+            "aac",
+            output_path,
+        ]
+
+    elif op in ["audio", "extract_audio", "mute", "mute_audio", "remove_audio"]:
+        action = params.get("action", "").lower()
+        if action in ["mute", "remove"] or op in ["mute", "mute_audio", "remove_audio"]:
+            # Mute audio, copy video stream
+            return [
+                "-i",
+                task.input_file,
+                "-an",
+                "-c:v",
+                "copy",
+                output_path,
+            ]
+        else:
+            # Extract audio to MP3 using libmp3lame
+            return [
+                "-i",
+                task.input_file,
+                "-vn",
+                "-c:a",
+                "libmp3lame",
+                "-q:a",
+                "2",
+                output_path,
+            ]
+
     else:
         # Default convert operation
         return [
@@ -177,7 +254,7 @@ def process_task(task_id: str):
     1. If cancelled in DB/Redis, exit immediately.
     2. Set state 'running', started_at, worker_id (hostname) in DB and Redis task:{id}.
     3. Build operation arguments and run FFmpeg with live progress tracking.
-    4. On success: set status 'done', output_file, finished_at.
+    4. On success: set status 'done', output_file, finished_at, expires_at.
     5. On Cancelled: delete partial file and set status 'cancelled'.
     6. On error: set status 'failed', error_message.
     """
@@ -186,13 +263,15 @@ def process_task(task_id: str):
     db = SessionLocal()
     worker_id = socket.gethostname()
     os.makedirs(settings.output_dir, exist_ok=True)
-    output_path = os.path.join(settings.output_dir, f"{task_id}.mp4")
 
     try:
         task = db.query(Task).filter(Task.id == task_uuid).first()
         if not task:
             logger.error("Task %s not found in database.", task_id)
             return
+
+        ext = get_output_extension(task)
+        output_path = os.path.join(settings.output_dir, f"{task_id}{ext}")
 
         # Check pre-cancellation
         if task.status == TaskStatus.cancelled or r.exists(f"cancel:{task_id}"):
@@ -227,6 +306,18 @@ def process_task(task_id: str):
         except Exception as e:
             logger.warning("Could not probe video duration for task %s: %s", task_id, e)
 
+        # Verify audio stream exists if operation is audio extraction
+        op = (task.operation_type or "convert").lower()
+        params = task.params or {}
+        if op in ["extract_audio", "extract"] or (op == "audio" and params.get("action") not in ["mute", "remove"]):
+            try:
+                probe_res = probe_video(task.input_file)
+                has_audio = any(s.get("codec_type") == "audio" for s in probe_res.raw_info.get("streams", []))
+                if not has_audio:
+                    raise RuntimeError("Input video does not contain an audio stream to extract.")
+            except Exception as e:
+                raise RuntimeError(str(e))
+
         # Build FFmpeg command arguments
         args = build_ffmpeg_args(task, output_path)
 
@@ -235,9 +326,11 @@ def process_task(task_id: str):
 
         # Complete task
         finished_at = datetime.now(timezone.utc)
+        expires_at = finished_at + timedelta(hours=settings.result_lifetime_hours)
         task.status = TaskStatus.done
         task.output_file = output_path
         task.finished_at = finished_at
+        task.expires_at = expires_at
         db.commit()
 
         r.hset(
@@ -247,6 +340,7 @@ def process_task(task_id: str):
                 "progress": 100,
                 "output_file": output_path,
                 "finished_at": str(finished_at),
+                "expires_at": str(expires_at),
             },
         )
         logger.info("Task %s completed successfully.", task_id)

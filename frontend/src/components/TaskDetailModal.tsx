@@ -51,6 +51,73 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  const getOperationLabel = (op: string) => {
+    switch (op) {
+      case 'watermark':
+        return '🏷️ Водяний знак';
+      case 'scale':
+        return '📉 Зміна масштабу';
+      case 'audio':
+      case 'extract_audio':
+        return '🎵 Обробка аудіо';
+      case 'convert':
+        return '🔄 Конвертація в MP4';
+      default:
+        return op;
+    }
+  };
+
+  const formatParamsText = () => {
+    const p = task.params;
+    if (!p || typeof p !== 'object' || Object.keys(p).length === 0) {
+      return 'Стандартні';
+    }
+
+    const op = task.operation_type;
+    if (op === 'watermark') {
+      const posMap: Record<string, string> = {
+        'top-left': 'зверху зліва',
+        'top-right': 'зверху справа',
+        'bottom-left': 'знизу зліва',
+        'bottom-right': 'знизу справа',
+        'bottom_right': 'знизу справа',
+        'center': 'по центру',
+      };
+      const pos = posMap[p.position] || p.position || 'знизу справа';
+      const opacity = p.opacity !== undefined ? `${Math.round(p.opacity * 100)}%` : '80%';
+      return `Позиція: ${pos}, прозорість: ${opacity}`;
+    }
+
+    if (op === 'scale') {
+      return `Роздільність: ${p.resolution || 720}p`;
+    }
+
+    if (op === 'audio') {
+      return p.action === 'mute' ? 'Вимкнення звукової доріжки' : `Видобування аудіо (${(p.format || 'MP3').toUpperCase()})`;
+    }
+
+    if (op === 'convert') {
+      const parts: string[] = [];
+      if (p.format) parts.push(`Формат: ${p.format.toUpperCase()}`);
+      if (p.resolution && p.resolution !== 'original') parts.push(`${p.resolution}p`);
+      return parts.length > 0 ? parts.join(', ') : 'H.264 / AAC';
+    }
+
+    if (op === 'filter') {
+      const parts: string[] = [];
+      if (p.filter) parts.push(`Фільтр: ${p.filter}`);
+      if (p.speed) parts.push(`Швидкість: ${p.speed}x`);
+      return parts.length > 0 ? parts.join(', ') : 'Без додаткових фільтрів';
+    }
+
+    // Generic fallback: format key-values cleanly, skipping internal server paths
+    const filtered = Object.entries(p)
+      .filter(([key]) => key !== 'logo_path' && key !== 'raw')
+      .map(([key, val]) => `${key}: ${val}`);
+
+    return filtered.length > 0 ? filtered.join(', ') : 'Стандартні';
+  };
+
   return (
     <dialog open style={{ backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <article className="card-container" style={{ maxWidth: '640px', width: '90%', maxHeight: '90vh', overflowY: 'auto', margin: 'auto' }}>
@@ -145,14 +212,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         <div className="file-meta-box" style={{ marginBottom: '1.5rem' }}>
           <div className="meta-row">
             <span>Операція:</span>
-            <strong>{task.operation_type}</strong>
+            <strong>{getOperationLabel(task.operation_type)}</strong>
           </div>
           {task.params && (
             <div className="meta-row">
               <span>Параметри:</span>
-              <code style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
-                {JSON.stringify(task.params)}
-              </code>
+              <span style={{ maxWidth: '65%', textAlign: 'right', wordBreak: 'break-word', color: '#e2e8f0', fontWeight: 500 }}>
+                {formatParamsText()}
+              </span>
             </div>
           )}
           {task.worker_id && (

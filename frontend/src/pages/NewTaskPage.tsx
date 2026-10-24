@@ -175,7 +175,7 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
         <form onSubmit={handleSubmit}>
           {/* File Picker */}
           <label htmlFor="video-file-input">
-            <strong>1. Виберіть відео</strong> (до 100 МБ, тривалість $\le$ 120 с, до 1080p)
+            <strong>1. Виберіть відео</strong> (до 100 МБ, тривалість ≤ 120 с, до 1080p)
             <input
               id="video-file-input"
               ref={fileInputRef}
@@ -257,7 +257,7 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
           {operationType === 'watermark' && (
             <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
               <label htmlFor="logo-file-input">
-                PNG логотип водяного знака ($\le$ 2 МБ):
+                PNG логотип водяного знака (до 2 МБ):
                 <input
                   id="logo-file-input"
                   type="file"

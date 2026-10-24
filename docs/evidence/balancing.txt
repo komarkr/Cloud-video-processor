@@ -1,7 +1,7 @@
 ================================================================================
 Cloud Video Processor - Day 3 Evidence: Load Balancing, HTTPS & Failover
 ================================================================================
-Date: 2026-10-23
+Date: 2026-10-24
 Test Target: Nginx Ingress (ports 80, 443), api1 (SERVER_ID=api1), api2 (SERVER_ID=api2)
 
 --------------------------------------------------------------------------------
@@ -9,8 +9,8 @@ Test Target: Nginx Ingress (ports 80, 443), api1 (SERVER_ID=api1), api2 (SERVER_
 --------------------------------------------------------------------------------
 $ curl -I http://localhost/api/health
 HTTP/1.1 301 Moved Permanently
-Server: nginx/1.27.0
-Date: Fri, 23 Oct 2026 12:00:01 GMT
+Server: nginx/1.31.8
+Date: Sat, 24 Oct 2026 13:36:12 GMT
 Content-Type: text/html
 Content-Length: 169
 Connection: keep-alive
@@ -25,33 +25,33 @@ $ for i in {1..6}; do curl -k -i -s https://localhost/api/health | grep -E "HTTP
 
 # Request 1:
 HTTP/1.1 200 OK
-X-Served-By: api1
-{"status":"ok","server_id":"api1"}
+x-served-by: api2
+{"status":"ok","server_id":"api2"}
 
 # Request 2:
 HTTP/1.1 200 OK
-X-Served-By: api2
-{"status":"ok","server_id":"api2"}
+x-served-by: api1
+{"status":"ok","server_id":"api1"}
 
 # Request 3:
 HTTP/1.1 200 OK
-X-Served-By: api1
-{"status":"ok","server_id":"api1"}
+x-served-by: api2
+{"status":"ok","server_id":"api2"}
 
 # Request 4:
 HTTP/1.1 200 OK
-X-Served-By: api2
-{"status":"ok","server_id":"api2"}
+x-served-by: api1
+{"status":"ok","server_id":"api1"}
 
 # Request 5:
 HTTP/1.1 200 OK
-X-Served-By: api1
-{"status":"ok","server_id":"api1"}
+x-served-by: api2
+{"status":"ok","server_id":"api2"}
 
 # Request 6:
 HTTP/1.1 200 OK
-X-Served-By: api2
-{"status":"ok","server_id":"api2"}
+x-served-by: api1
+{"status":"ok","server_id":"api1"}
 
 [RESULT]: Nginx distributes incoming HTTPS requests between api1 and api2 with X-Served-By header.
 
@@ -59,29 +59,29 @@ X-Served-By: api2
 3. High Availability / Failover Test: docker compose stop api1
 --------------------------------------------------------------------------------
 $ docker compose stop api1
-[+] Stopping 1/1
- ✔ Container cloud-video-processor-api1-1  Stopped                                                    0.4s
+Container cloud-video-processor-api1-1 Stopping 
+ Container cloud-video-processor-api1-1 Stopped
 
 $ for i in {1..4}; do curl -k -i -s https://localhost/api/health | grep -E "HTTP/|server_id|X-Served-By"; done
 
 # Request 1:
 HTTP/1.1 200 OK
-X-Served-By: api2
+x-served-by: api2
 {"status":"ok","server_id":"api2"}
 
 # Request 2:
 HTTP/1.1 200 OK
-X-Served-By: api2
+x-served-by: api2
 {"status":"ok","server_id":"api2"}
 
 # Request 3:
 HTTP/1.1 200 OK
-X-Served-By: api2
+x-served-by: api2
 {"status":"ok","server_id":"api2"}
 
 # Request 4:
 HTTP/1.1 200 OK
-X-Served-By: api2
+x-served-by: api2
 {"status":"ok","server_id":"api2"}
 
 [RESULT]: Stopping api1 did not cause service degradation. All traffic automatically routed to api2.
@@ -90,30 +90,36 @@ X-Served-By: api2
 4. Recover Node: docker compose start api1
 --------------------------------------------------------------------------------
 $ docker compose start api1
-[+] Starting 1/1
- ✔ Container cloud-video-processor-api1-1  Started                                                    0.3s
+Container cloud-video-processor-postgres-1 Waiting 
+ Container cloud-video-processor-postgres-1 Healthy 
+ Container cloud-video-processor-migrate-1 Starting 
+ Container cloud-video-processor-migrate-1 Started 
+ Container cloud-video-processor-migrate-1 Waiting 
+ Container cloud-video-processor-migrate-1 Exited 
+ Container cloud-video-processor-api1-1 Starting 
+ Container cloud-video-processor-api1-1 Started
 
 $ for i in {1..4}; do curl -k -i -s https://localhost/api/health | grep -E "HTTP/|server_id|X-Served-By"; done
 
 # Request 1:
 HTTP/1.1 200 OK
-X-Served-By: api1
-{"status":"ok","server_id":"api1"}
+x-served-by: api2
+{"status":"ok","server_id":"api2"}
 
 # Request 2:
 HTTP/1.1 200 OK
-X-Served-By: api2
-{"status":"ok","server_id":"api2"}
+x-served-by: api1
+{"status":"ok","server_id":"api1"}
 
 # Request 3:
 HTTP/1.1 200 OK
-X-Served-By: api1
-{"status":"ok","server_id":"api1"}
+x-served-by: api2
+{"status":"ok","server_id":"api2"}
 
 # Request 4:
 HTTP/1.1 200 OK
-X-Served-By: api2
-{"status":"ok","server_id":"api2"}
+x-served-by: api1
+{"status":"ok","server_id":"api1"}
 
 [RESULT]: api1 re-entered the upstream pool and traffic balancing resumed.
 
@@ -125,15 +131,15 @@ $ curl -k -i -X POST https://localhost/api/auth/login \
     -d '{"email":"admin@example.com","password":"admin_password_123"}'
 
 HTTP/1.1 200 OK
-Server: nginx/1.27.0
-Date: Fri, 23 Oct 2026 12:02:15 GMT
+Server: nginx/1.31.8
+Date: Sat, 24 Oct 2026 13:37:22 GMT
 Content-Type: application/json
-Content-Length: 172
+Content-Length: 190
 Connection: keep-alive
-X-Served-By: api2
-Set-Cookie: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Max-Age=3600; Path=/; SameSite=lax; Secure; HttpOnly
+set-cookie: access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlMTE2NjdiYi1jMzg1LTQ4NmUtOTdiNy0zYTcyMTVjNDEzOTMiLCJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwiaXNfYWRtaW4iOnRydWUsImV4cCI6MTc5Mjg1MjY0MiwiaWF0IjoxNzkyODQ5MDQyfQ.XwKyPY7VbbP-EAHxtRFwFZEjNEbFgu64L_0aLb0AMoY; HttpOnly; Max-Age=3600; Path=/; SameSite=lax; Secure
+x-served-by: api2
 
-{"status":"ok","message":"Logged in successfully","user":{"id":"a37e1bb9-6cb4-4822-b52f-e8b23c52a0a1","email":"admin@example.com","is_admin":true,"created_at":"2026-10-23T12:00:00Z"}}
+{"status":"ok","message":"Logged in successfully","user":{"id":"e11667bb-c385-486e-97b7-3a7215c41393","email":"admin@example.com","is_admin":true,"created_at":"2026-10-24T13:24:11.074039Z"}}
 
 [RESULT]: Login through Nginx succeeds and sets HttpOnly, Secure, SameSite=Lax cookie with X-Served-By header.
 
@@ -151,13 +157,13 @@ $ for i in {1..20}; do curl -k -s -o /dev/null -w "%{http_code}\n" -X POST https
 401
 401
 401
+401
+401
 429
 429
 429
 429
-429
-429
-429
+401
 429
 429
 429

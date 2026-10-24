@@ -4,12 +4,17 @@ import uuid
 from locust import HttpUser, between, task
 
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
 class VideoProcessingUser(HttpUser):
     # Wait between 1 and 2 seconds between tasks
     wait_time = between(1, 2)
 
     def on_start(self):
         """Register and login at start of user session."""
+        self.client.verify = False
         self.email = f"load_{uuid.uuid4().hex[:8]}@example.com"
         self.password = "LoadPass123!"
 

@@ -43,6 +43,21 @@ def ensure_task_owner(task_id: uuid.UUID, user: User, db: Session) -> Task:
     return task
 
 
+def _is_safe_data_path(file_path: Optional[str]) -> bool:
+    """Verifies that the target path is strictly within the managed data directories."""
+    if not file_path:
+        return False
+    try:
+        norm_target = os.path.realpath(os.path.abspath(file_path))
+        for allowed in [settings.upload_dir, settings.output_dir, settings.log_dir]:
+            norm_allowed = os.path.realpath(os.path.abspath(allowed))
+            if os.path.commonpath([norm_allowed, norm_target]) == norm_allowed:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 @router.post(
     "",
     response_model=TaskOut,
@@ -182,6 +197,8 @@ async def create_task(
         except json.JSONDecodeError:
             parsed_params = {"raw": params}
 
+    parsed_params.pop("logo_path", None)   # шлях до логотипа ставить лише сервер
+
     # Validate logo for watermark operation
     op = (operation_type or "convert").lower()
     if op == "watermark":
@@ -260,19 +277,19 @@ async def create_task(
             .all()
         )
         for old in oldest_completed:
-            if old.input_file and os.path.exists(old.input_file):
+            if old.input_file and _is_safe_data_path(old.input_file) and os.path.exists(old.input_file):
                 try:
                     os.remove(old.input_file)
                 except OSError:
                     pass
-            if old.output_file and os.path.exists(old.output_file):
+            if old.output_file and _is_safe_data_path(old.output_file) and os.path.exists(old.output_file):
                 try:
                     os.remove(old.output_file)
                 except OSError:
                     pass
             if old.params and isinstance(old.params, dict):
                 old_logo = old.params.get("logo_path")
-                if old_logo and os.path.exists(old_logo):
+                if old_logo and _is_safe_data_path(old_logo) and os.path.exists(old_logo):
                     try:
                         os.remove(old_logo)
                     except OSError:
@@ -490,13 +507,13 @@ def delete_task(
         db.commit()
 
     # Clean up files from disk
-    if task.input_file and os.path.exists(task.input_file):
+    if task.input_file and _is_safe_data_path(task.input_file) and os.path.exists(task.input_file):
         try:
             os.remove(task.input_file)
         except OSError:
             pass
 
-    if task.output_file and os.path.exists(task.output_file):
+    if task.output_file and _is_safe_data_path(task.output_file) and os.path.exists(task.output_file):
         try:
             os.remove(task.output_file)
         except OSError:
@@ -504,7 +521,7 @@ def delete_task(
 
     if task.params and isinstance(task.params, dict):
         logo_path = task.params.get("logo_path")
-        if logo_path and os.path.exists(logo_path):
+        if logo_path and _is_safe_data_path(logo_path) and os.path.exists(logo_path):
             try:
                 os.remove(logo_path)
             except OSError:

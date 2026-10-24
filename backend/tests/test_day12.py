@@ -227,3 +227,81 @@ def test_admin_cleanup_endpoint(client: TestClient, db_session, monkeypatch):
     data = response.json()
     assert data["status"] == "ok"
     assert "purged_count" in data
+
+
+def test_arbitrary_file_deletion_via_logo_path_prevented(client: TestClient, db_session, monkeypatch, tmp_path):
+    """
+    Security Audit Test:
+    Verify that an attacker cannot pass arbitrary system or application paths
+    in params['logo_path'] to trigger deletion of sensitive files on disk
+    via create_task, delete_task, or cleanup_expired_tasks.
+    """
+    # 1. Create a dummy sensitive file outside the data directories
+    sensitive_file = tmp_path / "sensitive_app_file.py"
+    sensitive_file.write_text("# SENSITIVE CODE DO NOT DELETE")
+    assert sensitive_file.exists()
+
+    # Register & Login
+    attacker_email = "attacker@example.com"
+    client.post("/api/auth/register", json={"email": attacker_email, "password": "password123"})
+    client.post("/api/auth/login", json={"email": attacker_email, "password": "password123"})
+    attacker = db_session.query(User).filter(User.email == attacker_email).first()
+
+    # Mock video validation to succeed
+    from unittest.mock import MagicMock
+    mock_probe = MagicMock(duration=5.0, width=1280, height=720, format_name="mp4")
+    monkeypatch.setattr("app.routers.tasks.probe_video", lambda p: mock_probe)
+
+    # 2. Attempt to inject logo_path pointing to sensitive file via create_task
+    import json
+    malicious_params = json.dumps({"logo_path": str(sensitive_file), "custom_opt": 123})
+    res = client.post(
+        "/api/tasks",
+        files={"file": ("video.mp4", io.BytesIO(b"dummy video content"), "video/mp4")},
+        data={"operation_type": "convert", "params": malicious_params},
+    )
+    assert res.status_code == 201
+    created_task_id = res.json()["id"]
+
+    # Verify task in DB: logo_path MUST be popped/stripped!
+    db_task = db_session.query(Task).filter(Task.id == uuid.UUID(created_task_id)).first()
+    assert db_task is not None
+    assert "logo_path" not in (db_task.params or {})
+    assert sensitive_file.exists()
+
+    # 3. Simulate existing task with malicious logo_path directly in DB
+    evil_task_id = uuid.uuid4()
+    evil_task = Task(
+        id=evil_task_id,
+        user_id=attacker.id,
+        status=TaskStatus.done,
+        operation_type="watermark",
+        params={"logo_path": str(sensitive_file)},
+        input_file=os.path.join(settings.upload_dir, f"{evil_task_id}.mp4"),
+    )
+    db_session.add(evil_task)
+    db_session.commit()
+
+    # Call DELETE /api/tasks/{evil_task_id}
+    del_res = client.delete(f"/api/tasks/{evil_task_id}")
+    assert del_res.status_code == 200
+
+    # Sensitive file MUST NOT be deleted!
+    assert sensitive_file.exists()
+
+    # 4. Test cleanup_expired_tasks safety with malicious logo_path
+    expired_evil = Task(
+        id=uuid.uuid4(),
+        user_id=attacker.id,
+        status=TaskStatus.done,
+        operation_type="watermark",
+        input_file=os.path.join(settings.upload_dir, "expired.mp4"),
+        params={"logo_path": str(sensitive_file)},
+        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    db_session.add(expired_evil)
+    db_session.commit()
+
+    cleanup_expired_tasks(db_session)
+    assert sensitive_file.exists()
+

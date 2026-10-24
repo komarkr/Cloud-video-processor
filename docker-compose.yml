@@ -91,8 +91,8 @@ services:
     environment:
       - MIN_WORKERS=2
       - MAX_WORKERS=4
-      - PER_WORKER=2
-      - IDLE_FOR=60
+      - PER_WORKER=1
+      - IDLE_FOR=30
       - DOCKER_NETWORK=cloud-video-processor_default
       - MEDIA_VOLUME=cloud-video-processor_media
     volumes:

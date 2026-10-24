@@ -172,6 +172,37 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
           </div>
         )}
 
+        {/* Sample Demo Videos for Testing */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          borderRadius: '10px',
+          padding: '1rem',
+          marginBottom: '1.5rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#38bdf8', fontWeight: 600, fontSize: '0.95rem' }}>
+            <span>🎬</span>
+            <span>Готові зразки для тестування (натисніть, щоб завантажити на комп'ютер):</span>
+          </div>
+          <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '0 0 0.75rem 0' }}>
+            Завантажте ці файли, щоб побачити реальну зміну картинки, аудіо та помітне навантаження на воркери:
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <a href="/samples/fractal_universe_30s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
+              🌀 Фрактал (30 с, 1080p, аудіо)
+            </a>
+            <a href="/samples/cyber_particles_20s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
+              ⚡ Кібер-геометрія (20 с, 1080p)
+            </a>
+            <a href="/samples/synthesizer_melody_25s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
+              🎵 Синтезатор (25 с, аудіо)
+            </a>
+            <a href="/samples/watermark_logo.png" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
+              🏷️ Фірмовий логотип (PNG)
+            </a>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit}>
           {/* File Picker */}
           <label htmlFor="video-file-input">

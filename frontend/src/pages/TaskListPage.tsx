@@ -192,16 +192,64 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
     }
   };
 
+  const [stressLoading, setStressLoading] = useState(false);
+
+  const handleRunStressTest = async () => {
+    if (!window.confirm("Запустити 3 важкі відеозадачі одночасно для перевірки черги та автомасштабування воркерів?")) {
+      return;
+    }
+    setStressLoading(true);
+    try {
+      const res = await fetch('/samples/fractal_universe_30s.mp4');
+      const blob = await res.blob();
+      const sampleFile = new File([blob], 'fractal_universe_30s.mp4', { type: 'video/mp4' });
+
+      const ops = [
+        { op: 'convert', params: '{"preset":"medium"}' },
+        { op: 'scale', params: '{"resolution":"720","preset":"medium"}' },
+        { op: 'convert', params: '{"preset":"medium"}' },
+      ];
+
+      for (const item of ops) {
+        const fd = new FormData();
+        fd.append('file', sampleFile);
+        fd.append('operation_type', item.op);
+        fd.append('params', item.params);
+        await tasksApi.create(fd);
+      }
+
+      await fetchTasks();
+    } catch (err: any) {
+      alert('Помилка запуску стрес-тесту: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setStressLoading(false);
+    }
+  };
+
   return (
     <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2>Мої задачі</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 0 }}>
             Відстежуйте стан, прогрес обробки у реальному часі та переглядайте результат.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            className="nav-btn"
+            onClick={handleRunStressTest}
+            disabled={stressLoading}
+            style={{
+              background: 'linear-gradient(135deg, #e11d48, #be123c)',
+              borderColor: '#fda4af',
+              color: '#fff',
+              fontWeight: 600,
+            }}
+            title="Запустити одночасно 3 важкі відео для демонстрації черги та масштабування"
+          >
+            {stressLoading ? '⏳ Запуск...' : '🔥 Стрес-тест (навантаження)'}
+          </button>
           <button className="nav-btn" onClick={fetchTasks} title="Оновити список">
             🔄 Оновити
           </button>

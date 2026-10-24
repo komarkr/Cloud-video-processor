@@ -153,6 +153,7 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
     """Build FFmpeg command line arguments based on operation_type and params with strict protocol whitelist."""
     op = (task.operation_type or "convert").lower()
     params = task.params or {}
+    preset = params.get("preset", "medium")
 
     if op == "convert":
         return [
@@ -163,7 +164,7 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            preset,
             "-crf",
             "23",
             "-c:a",
@@ -190,7 +191,7 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            preset,
             "-crf",
             str(crf),
             "-c:a",
@@ -226,7 +227,7 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            preset,
             "-crf",
             "23",
             "-c:a",
@@ -273,7 +274,7 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            preset,
             "-crf",
             "23",
             "-c:a",

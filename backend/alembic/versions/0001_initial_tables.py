@@ -41,7 +41,7 @@ def upgrade() -> None:
         'tasks',
         sa.Column('id', sa.UUID(), nullable=False),
         sa.Column('user_id', sa.UUID(), nullable=False),
-        sa.Column('status', sa.Enum('queued', 'running', 'done', 'failed', 'cancelled', name='task_status_enum'), nullable=False),
+        sa.Column('status', sa.Enum('queued', 'running', 'done', 'failed', 'cancelled', name='task_status_enum', create_type=False), nullable=False),
         sa.Column('operation_type', sa.String(), nullable=False),
         sa.Column('params', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('input_file', sa.String(), nullable=False),

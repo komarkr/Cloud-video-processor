@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${DB_USER:-cvp}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${DB_HOST_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cvp} -d ${DB_NAME:-cvp}"]
       interval: 3s
@@ -24,6 +24,8 @@ services:
     command: alembic upgrade head
     env_file:
       - .env
+    volumes:
+      - ./backend:/app
     depends_on:
       postgres:
         condition: service_healthy

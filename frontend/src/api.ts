@@ -30,7 +30,11 @@ export const authApi = {
   },
   async register(email: string, password: string): Promise<User> {
     const res = await api.post('/api/register', { email, password });
-    return res.data.user;
+    try {
+      return await authApi.login(email, password);
+    } catch {
+      return res.data;
+    }
   },
   async logout(): Promise<void> {
     await api.post('/api/logout');

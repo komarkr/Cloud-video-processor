@@ -64,7 +64,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
         {error && (
           <div className="file-meta-box error" style={{ marginBottom: '1.25rem' }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
 

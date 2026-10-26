@@ -61,7 +61,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
     return (
       <div className="container" style={{ padding: '3rem 1rem', maxWidth: '600px' }}>
         <article className="card-container" style={{ textAlign: 'center', borderColor: 'rgba(239, 68, 68, 0.4)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⛔</div>
           <h2 style={{ color: '#f87171' }}>403 Доступ заборонено</h2>
           <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
             Ця сторінка доступна виключно для користувачів із правами адміністратора системи.
@@ -96,9 +95,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span>⚡ Адмін-панель кластера</span>
+            <span>Адмін-панель кластера</span>
             <span style={{ fontSize: '0.75rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '0.2rem 0.6rem', borderRadius: '999px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-              🟢 Live 3s
+              Live 3s
             </span>
           </h2>
           <p style={{ color: '#94a3b8', margin: '0.3rem 0 0', fontSize: '0.9rem' }}>
@@ -107,7 +106,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
         </div>
         <div style={{ display: 'flex', gap: '0.6rem' }}>
           <button className="nav-btn" onClick={() => fetchOverview(false)} title="Оновити дані негайно">
-            🔄 Оновити
+            Оновити
           </button>
           <button className="nav-btn" onClick={onGoBack}>
             ← До моїх задач
@@ -117,13 +116,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
 
       {error && (
         <div className="file-meta-box error" style={{ marginBottom: '1.5rem' }}>
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
       {actionMsg && (
         <div className="file-meta-box" style={{ marginBottom: '1.5rem', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}>
-          ℹ️ {actionMsg}
+          {actionMsg}
         </div>
       )}
 
@@ -182,7 +181,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
           {/* Active Workers Section */}
           <article className="card-container" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>🖥️ Активні воркери (Heartbeat)</span>
+              <span>Активні воркери (Heartbeat)</span>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 400 }}>
                 ({overview.workers.length} онлайн)
               </span>
@@ -248,11 +247,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
                         <td>
                           {w.current_task ? (
                             <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>
-                              ⚙️ {w.current_task.slice(0, 8)}...
+                              В процесі: {w.current_task.slice(0, 8)}...
                             </span>
                           ) : (
                             <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                              💤 Вільний (idle)
+                              Вільний (idle)
                             </span>
                           )}
                         </td>
@@ -272,7 +271,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
           {/* Autoscaler Events Log Section */}
           <article className="card-container" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>📈 Журнал автомасштабування (Autoscaler Log)</span>
+              <span>Журнал автомасштабування (Autoscaler Log)</span>
             </h3>
 
             {overview.autoscaler_events.length === 0 ? (
@@ -301,7 +300,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
                               border: `1px solid ${ev.action.includes('scale_up') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
                             }}
                           >
-                            {ev.action.includes('scale_up') ? '⬆️ Scale Up' : '⬇️ Scale Down'}
+                            {ev.action.includes('scale_up') ? 'Scale Up' : 'Scale Down'}
                           </span>
                         </td>
                         <td style={{ fontWeight: 600 }}>{ev.workers} воркер(и)</td>
@@ -317,7 +316,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
           {/* Recent 50 Tasks Section */}
           <article className="card-container" style={{ padding: '1.25rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>📋 Останні 50 задач кластера</span>
+              <span>Останні 50 задач кластера</span>
             </h3>
 
             {overview.recent_tasks.length === 0 ? (
@@ -348,11 +347,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
                         <td style={{ fontSize: '0.85rem', fontWeight: 500 }}>{task.operation_type}</td>
                         <td>
                           <span className={`status-badge ${task.status}`}>
-                            {task.status === 'queued' && '⏳ У черзі'}
-                            {task.status === 'running' && '⚙️ Обробка'}
-                            {task.status === 'done' && '✅ Готово'}
-                            {task.status === 'failed' && '❌ Помилка'}
-                            {task.status === 'cancelled' && '🚫 Скасовано'}
+                            {task.status === 'queued' && 'У черзі'}
+                            {task.status === 'running' && 'Обробка'}
+                            {task.status === 'done' && 'Готово'}
+                            {task.status === 'failed' && 'Помилка'}
+                            {task.status === 'cancelled' && 'Скасовано'}
                           </span>
                         </td>
                         <td>
@@ -376,7 +375,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
                               onClick={() => handleCancelTask(task.id)}
                               title="Примусово скасувати задачу"
                             >
-                              {cancellingId === task.id ? '...' : '⏹️ Скасувати'}
+                              {cancellingId === task.id ? '...' : 'Скасувати'}
                             </button>
                           )}
                         </td>

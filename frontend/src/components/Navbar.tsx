@@ -28,13 +28,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`nav-btn ${activeTab === 'tasks' ? 'active' : ''}`}
               onClick={() => setActiveTab('tasks')}
             >
-              📋 Мої задачі
+              Мої задачі
             </button>
             <button
               className={`nav-btn ${activeTab === 'new-task' ? 'active' : ''}`}
               onClick={() => setActiveTab('new-task')}
             >
-              ➕ Нова задача
+              Нова задача
             </button>
             {user.is_admin && (
               <button
@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 onClick={() => setActiveTab('admin')}
               >
-                ⚡ Адмін-панель
+                Адмін-панель
               </button>
             )}
             <div className="user-tag">
@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {user.is_admin && <span className="admin-badge">Admin</span>}
             </div>
             <button className="nav-btn" onClick={onLogout} title="Вийти з акаунту">
-              🚪 Вийти
+              Вийти
             </button>
           </nav>
         )}

@@ -25,9 +25,10 @@ router = APIRouter(prefix="/api", tags=["auth"])
 )
 def register(
     user_in: UserRegister,
+    response: Response,
     db: Session = Depends(get_db),
 ):
-    """Register a new user account with duplicate email check."""
+    """Register a new user account with duplicate email check and set auth cookie."""
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
         raise HTTPException(
@@ -43,6 +44,25 @@ def register(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    token = create_access_token(
+        data={
+            "sub": str(new_user.id),
+            "email": new_user.email,
+            "is_admin": new_user.is_admin,
+        }
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        max_age=settings.jwt_expire_minutes * 60,
+        path="/",
+    )
+
     return new_user
 
 

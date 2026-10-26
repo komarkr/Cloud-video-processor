@@ -54,14 +54,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const getOperationLabel = (op: string) => {
     switch (op) {
       case 'watermark':
-        return '🏷️ Водяний знак';
+        return 'Водяний знак';
       case 'scale':
-        return '📉 Зміна масштабу';
+        return 'Зміна масштабу';
       case 'audio':
       case 'extract_audio':
-        return '🎵 Обробка аудіо';
+        return 'Обробка аудіо';
       case 'convert':
-        return '🔄 Конвертація в MP4';
+        return 'Конвертація в MP4';
       default:
         return op;
     }
@@ -142,13 +142,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           <span className={`status-badge ${task.status}`}>
             {task.status === 'queued' && (
               task.queue_position
-                ? `⏳ ${formatQueueInfo(task.queue_position, task.eta_sec)}`
-                : '⏳ У черзі'
+                ? formatQueueInfo(task.queue_position, task.eta_sec)
+                : 'У черзі'
             )}
-            {task.status === 'running' && '⚙️ Виконується'}
-            {task.status === 'done' && '✅ Готово'}
-            {task.status === 'failed' && '❌ Помилка'}
-            {task.status === 'cancelled' && '🚫 Скасовано'}
+            {task.status === 'running' && 'Виконується'}
+            {task.status === 'done' && 'Готово'}
+            {task.status === 'failed' && 'Помилка'}
+            {task.status === 'cancelled' && 'Скасовано'}
           </span>
           {task.status === 'running' && (
             <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>
@@ -161,7 +161,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         {task.status === 'queued' && (
           <div className="file-meta-box" style={{ marginBottom: '1.25rem', borderColor: 'rgba(56, 189, 248, 0.4)' }}>
             <h4 style={{ color: '#38bdf8', fontSize: '0.95rem', margin: '0 0 0.4rem' }}>
-              ℹ️ Статус очікування черги:
+              Статус очікування черги:
             </h4>
             <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 500 }}>
               {formatQueueInfo(task.queue_position, task.eta_sec)}
@@ -178,7 +178,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         {task.status === 'failed' && task.error_message && (
           <div className="file-meta-box error" style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ color: '#f87171', fontSize: '0.95rem', margin: '0 0 0.5rem' }}>
-              ⚠️ Текст помилки обробки:
+              Текст помилки обробки:
             </h4>
             <pre style={{ margin: 0, padding: '0.75rem', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.8rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#fca5a5' }}>
               {task.error_message}
@@ -190,7 +190,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         {task.status === 'done' && (
           <div style={{ marginBottom: '1.5rem', background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '10px' }}>
             <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#38bdf8' }}>
-              🎬 Попередній перегляд результату:
+              Попередній перегляд результату:
             </h4>
             {isAudioExtract ? (
               <audio controls src={downloadUrl} style={{ width: '100%' }}>
@@ -274,7 +274,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
           {task.status === 'done' && (
             <a href={downloadUrl} download className="action-btn download">
-              ⬇️ Скачати файл
+              Скачати файл
             </a>
           )}
           {(task.status === 'queued' || task.status === 'running') && (
@@ -286,7 +286,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 onClose();
               }}
             >
-              ⏹️ Скасувати
+              Скасувати
             </button>
           )}
           <button
@@ -297,7 +297,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               onClose();
             }}
           >
-            🗑️ Видалити
+            Видалити
           </button>
           <button type="button" className="nav-btn" onClick={onClose}>
             Закрити

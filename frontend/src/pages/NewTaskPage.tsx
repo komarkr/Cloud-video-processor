@@ -162,13 +162,13 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
 
         {validationError && (
           <div className="file-meta-box error">
-            ⚠️ <strong>Помилка валідації:</strong> {validationError}
+            <strong>Помилка валідації:</strong> {validationError}
           </div>
         )}
 
         {submitError && (
           <div className="file-meta-box error">
-            ❌ <strong>Помилка сервера:</strong> {submitError}
+            <strong>Помилка сервера:</strong> {submitError}
           </div>
         )}
 
@@ -181,7 +181,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
           marginBottom: '1.5rem',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#38bdf8', fontWeight: 600, fontSize: '0.95rem' }}>
-            <span>🎬</span>
             <span>Готові зразки для тестування (натисніть, щоб завантажити на комп'ютер):</span>
           </div>
           <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '0 0 0.75rem 0' }}>
@@ -189,16 +188,16 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             <a href="/samples/fractal_universe_30s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              🌀 Фрактал (30 с, 1080p, аудіо)
+              Фрактал (30 с, 1080p, аудіо)
             </a>
             <a href="/samples/cyber_particles_20s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              ⚡ Кібер-геометрія (20 с, 1080p)
+              Кібер-геометрія (20 с, 1080p)
             </a>
             <a href="/samples/synthesizer_melody_25s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              🎵 Синтезатор (25 с, аудіо)
+              Синтезатор (25 с, аудіо)
             </a>
             <a href="/samples/watermark_logo.png" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              🏷️ Фірмовий логотип (PNG)
+              Фірмовий логотип (PNG)
             </a>
           </div>
         </div>
@@ -206,7 +205,7 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
         <form onSubmit={handleSubmit}>
           {/* File Picker */}
           <label htmlFor="video-file-input">
-            <strong>1. Виберіть відео</strong> (до 100 МБ, тривалість ≤ 120 с, до 1080p)
+            <strong>1. Виберіть відео</strong> (до 100 МБ, тривалість до 120 с, до 1080p)
             <input
               id="video-file-input"
               ref={fileInputRef}
@@ -226,11 +225,11 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
           {file && videoMeta && (
             <div className="file-meta-box">
               <div className="meta-row">
-                <span>📁 Назва файлу:</span>
+                <span>Назва файлу:</span>
                 <strong>{file.name}</strong>
               </div>
               <div className="meta-row">
-                <span>⏱️ Тривалість:</span>
+                <span>Тривалість:</span>
                 <strong>
                   {videoMeta.duration >= 60
                     ? `${Math.floor(videoMeta.duration / 60)} хв ${Math.round(videoMeta.duration % 60)} с`
@@ -238,11 +237,11 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
                 </strong>
               </div>
               <div className="meta-row">
-                <span>📐 Роздільна здатність:</span>
+                <span>Роздільна здатність:</span>
                 <strong>{videoMeta.width} × {videoMeta.height} px</strong>
               </div>
               <div className="meta-row">
-                <span>💾 Розмір:</span>
+                <span>Розмір:</span>
                 <strong>{(file.size / (1024 * 1024)).toFixed(2)} МБ</strong>
               </div>
             </div>
@@ -257,10 +256,10 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
               onChange={(e) => setOperationType(e.target.value)}
               disabled={submitting}
             >
-              <option value="convert">🔄 Конвертація в MP4 (H.264 + AAC)</option>
-              <option value="scale">📉 Зміна роздільної здатності (Scale)</option>
-              <option value="watermark">🏷️ Водяний знак (Watermark)</option>
-              <option value="audio">🎵 Обробка аудіо (Extract / Mute)</option>
+              <option value="convert">Конвертація в MP4 (H.264 + AAC)</option>
+              <option value="scale">Зміна роздільної здатності (Scale)</option>
+              <option value="watermark">Водяний знак (Watermark)</option>
+              <option value="audio">Обробка аудіо (Extract / Mute)</option>
             </select>
           </label>
 
@@ -348,8 +347,8 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
                   onChange={(e) => setAudioAction(e.target.value)}
                   disabled={submitting}
                 >
-                  <option value="extract">🎧 Видобути аудіодоріжку в MP3 (libmp3lame)</option>
-                  <option value="mute">🔇 Вимкнути звук / Mute (відео без звуку у MP4)</option>
+                  <option value="extract">Видобути аудіодоріжку в MP3 (libmp3lame)</option>
+                  <option value="mute">Вимкнути звук / Mute (відео без звуку у MP4)</option>
                 </select>
               </label>
             </div>
@@ -373,7 +372,7 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             disabled={submitting || !file || !!validationError}
             style={{ width: '100%', marginTop: '1.5rem' }}
           >
-            {submitting ? 'Завантаження...' : '🚀 Запустити обробку'}
+            {submitting ? 'Завантаження...' : 'Запустити обробку'}
           </button>
         </form>
       </article>

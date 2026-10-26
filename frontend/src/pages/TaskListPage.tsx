@@ -168,15 +168,15 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
     const op = task.operation_type;
     const p = task.params || {};
     if (op === 'scale') {
-      return `📉 Зміна масштабу (${p.resolution || 720}p)`;
+      return `Зміна масштабу (${p.resolution || 720}p)`;
     }
     if (op === 'watermark') {
-      return `🏷️ Водяний знак (${p.position || 'bottom_right'})`;
+      return `Водяний знак (${p.position || 'bottom_right'})`;
     }
     if (op === 'audio') {
-      return p.action === 'mute' ? '🔇 Вимкнення звуку' : '🎧 Видобування аудіо (MP3)';
+      return p.action === 'mute' ? 'Вимкнення звуку' : 'Видобування аудіо (MP3)';
     }
-    return '🔄 Конвертація в MP4';
+    return 'Конвертація в MP4';
   };
 
   const formatDate = (dateStr: string) => {
@@ -192,40 +192,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
     }
   };
 
-  const [stressLoading, setStressLoading] = useState(false);
-
-  const handleRunStressTest = async () => {
-    if (!window.confirm("Запустити 3 важкі відеозадачі одночасно для перевірки черги та автомасштабування воркерів?")) {
-      return;
-    }
-    setStressLoading(true);
-    try {
-      const res = await fetch('/samples/fractal_universe_30s.mp4');
-      const blob = await res.blob();
-      const sampleFile = new File([blob], 'fractal_universe_30s.mp4', { type: 'video/mp4' });
-
-      const ops = [
-        { op: 'convert', params: '{"preset":"medium"}' },
-        { op: 'scale', params: '{"resolution":"720","preset":"medium"}' },
-        { op: 'convert', params: '{"preset":"medium"}' },
-      ];
-
-      for (const item of ops) {
-        const fd = new FormData();
-        fd.append('file', sampleFile);
-        fd.append('operation_type', item.op);
-        fd.append('params', item.params);
-        await tasksApi.create(fd);
-      }
-
-      await fetchTasks();
-    } catch (err: any) {
-      alert('Помилка запуску стрес-тесту: ' + (err.response?.data?.detail || err.message));
-    } finally {
-      setStressLoading(false);
-    }
-  };
-
   return (
     <div className="container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -236,32 +202,18 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            className="nav-btn"
-            onClick={handleRunStressTest}
-            disabled={stressLoading}
-            style={{
-              background: 'linear-gradient(135deg, #e11d48, #be123c)',
-              borderColor: '#fda4af',
-              color: '#fff',
-              fontWeight: 600,
-            }}
-            title="Запустити одночасно 3 важкі відео для демонстрації черги та масштабування"
-          >
-            {stressLoading ? '⏳ Запуск...' : '🔥 Стрес-тест (навантаження)'}
-          </button>
           <button className="nav-btn" onClick={fetchTasks} title="Оновити список">
-            🔄 Оновити
+            Оновити
           </button>
           <button className="nav-btn active" onClick={onGoToNewTask}>
-            ➕ Нова задача
+            Нова задача
           </button>
         </div>
       </div>
 
       {error && (
         <div className="file-meta-box error">
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -271,7 +223,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
         </article>
       ) : tasks.length === 0 ? (
         <article className="card-container" style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🎬</div>
           <h3>У вас ще немає задач</h3>
           <p style={{ color: '#94a3b8', maxWidth: '400px', margin: '0 auto 1.5rem' }}>
             Завантажте відео для конвертації, зміни масштабу, накладання водяного знака або видобування аудіо.
@@ -316,13 +267,13 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                       <span className={`status-badge ${task.status}`}>
                         {task.status === 'queued' && (
                           task.queue_position
-                            ? `⏳ ${formatQueueInfo(task.queue_position, task.eta_sec)}`
-                            : '⏳ У черзі'
+                            ? formatQueueInfo(task.queue_position, task.eta_sec)
+                            : 'У черзі'
                         )}
-                        {task.status === 'running' && '⚙️ Виконується'}
-                        {task.status === 'done' && '✅ Готово'}
-                        {task.status === 'failed' && '❌ Помилка'}
-                        {task.status === 'cancelled' && '🚫 Скасовано'}
+                        {task.status === 'running' && 'Виконується'}
+                        {task.status === 'done' && 'Готово'}
+                        {task.status === 'failed' && 'Помилка'}
+                        {task.status === 'cancelled' && 'Скасовано'}
                       </span>
                       {task.status === 'queued' && task.queue_position && (
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
@@ -355,7 +306,7 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                           onClick={() => setSelectedTask(task)}
                           title="Переглянути деталі та медіа"
                         >
-                          {task.status === 'done' ? '👁️ Перегляд' : 'ℹ️ Деталі'}
+                          {task.status === 'done' ? 'Перегляд' : 'Деталі'}
                         </button>
 
                         {/* Download button for completed task */}
@@ -366,7 +317,7 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                             className="action-btn download"
                             title="Завантажити готовий файл"
                           >
-                            ⬇️ Скачати
+                            Скачати
                           </a>
                         )}
 
@@ -378,7 +329,7 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                             onClick={() => handleCancel(task.id)}
                             title="Скасувати обробку"
                           >
-                            ⏹️ Скасувати
+                            Скасувати
                           </button>
                         )}
 
@@ -389,7 +340,7 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                           onClick={() => handleDelete(task.id)}
                           title="Видалити задачу"
                         >
-                          🗑️
+                          Видалити
                         </button>
                       </div>
                     </td>

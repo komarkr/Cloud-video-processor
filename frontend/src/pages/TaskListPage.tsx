@@ -242,21 +242,55 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
             onClick={handleRunStressTest}
             disabled={stressLoading}
             style={{
-              fontSize: '0.75rem',
-              padding: '0.3rem 0.6rem',
+              margin: 0,
+              height: '38px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.85rem',
+              padding: '0.4rem 0.8rem',
               color: '#64748b',
-              border: '1px dashed rgba(148, 163, 184, 0.25)',
+              border: '1px solid rgba(148, 163, 184, 0.25)',
               background: 'transparent',
-              borderRadius: '4px',
+              borderRadius: '6px',
+              lineHeight: 1,
+              boxSizing: 'border-box',
             }}
             title="Запустити 3 важкі задачі для демонстрації навантаження та автомасштабування"
           >
             {stressLoading ? 'Запуск...' : 'Тест навантаження'}
           </button>
-          <button className="nav-btn" onClick={fetchTasks} title="Оновити список">
+          <button
+            type="button"
+            className="nav-btn"
+            onClick={fetchTasks}
+            title="Оновити список"
+            style={{
+              margin: 0,
+              height: '38px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+              boxSizing: 'border-box',
+            }}
+          >
             Оновити
           </button>
-          <button className="nav-btn active" onClick={onGoToNewTask}>
+          <button
+            type="button"
+            className="nav-btn active"
+            onClick={onGoToNewTask}
+            style={{
+              margin: 0,
+              height: '38px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+              boxSizing: 'border-box',
+            }}
+          >
             Нова задача
           </button>
         </div>

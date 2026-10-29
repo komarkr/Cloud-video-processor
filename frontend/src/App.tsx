@@ -15,14 +15,12 @@ export function App() {
   });
 
   useEffect(() => {
-    // Check initial session
     authApi
       .getMe()
       .then((me) => setUser(me))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
 
-    // Handle 401 Unauthorized interceptor event
     const handleUnauthorized = () => {
       setUser(null);
     };

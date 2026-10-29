@@ -8,7 +8,6 @@ celery_app = Celery(
     include=["worker.tasks", "worker.heartbeat"],
 )
 
-# Critical configurations for fair load balancing and fault tolerance
 celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_acks_late=True,
@@ -28,4 +27,4 @@ celery_app.conf.update(
     },
 )
 
-app = celery_app  # Alias for `celery -A worker.app worker`
+app = celery_app

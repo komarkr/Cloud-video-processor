@@ -32,10 +32,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
   };
 
   useEffect(() => {
-    // Initial fetch
     fetchOverview(true);
 
-    // Poll overview every 3 seconds as required
     const interval = setInterval(() => {
       fetchOverview(false);
     }, 3000);
@@ -74,9 +72,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
   }
 
   const getMetricColor = (val: number) => {
-    if (val > 80) return '#ef4444'; // Red
-    if (val > 50) return '#f59e0b'; // Amber
-    return '#10b981'; // Green
+    if (val > 80) return '#ef4444';
+    if (val > 50) return '#f59e0b';
+    return '#10b981';
   };
 
   const formatDate = (dateStr?: string | null) => {
@@ -91,7 +89,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
 
   return (
     <div className="container" style={{ padding: '1.5rem 1rem' }}>
-      {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -132,7 +129,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
         </article>
       ) : overview ? (
         <>
-          {/* Statistics Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
             <div className="card-container" style={{ padding: '1rem', textAlign: 'center' }}>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Всього задач</span>
@@ -178,7 +174,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
             </div>
           </div>
 
-          {/* Active Workers Section */}
           <article className="card-container" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>Активні воркери (Heartbeat)</span>
@@ -268,7 +263,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
             )}
           </article>
 
-          {/* Autoscaler Events Log Section */}
           <article className="card-container" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>Журнал автомасштабування (Autoscaler Log)</span>
@@ -313,7 +307,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
             )}
           </article>
 
-          {/* Recent 50 Tasks Section */}
           <article className="card-container" style={{ padding: '1.25rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>Останні 50 задач кластера</span>

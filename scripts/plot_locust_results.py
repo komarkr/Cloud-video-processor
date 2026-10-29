@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Real benchmark data from Locust runs on 2 vs 4 Celery workers
 labels = ['Tasks Processed', 'Upload Throughput (tasks/min)', 'Polling Median Latency (ms)', 'Polling p95 Latency (ms)']
 two_workers = [26, 0.68 * 60, 23, 65]
 four_workers = [35, 0.89 * 60, 31, 83]
@@ -11,7 +10,6 @@ width = 0.35
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-# Plot 1: Throughput and Tasks
 sub_labels1 = ['Total Completed Tasks', 'Throughput (tasks/min)']
 val_2w_1 = [26, 40.8]
 val_4w_1 = [35, 53.4]
@@ -35,7 +33,6 @@ for rect in rects1 + rects2:
                 textcoords="offset points",
                 ha='center', va='bottom', fontweight='bold')
 
-# Plot 2: Latencies
 sub_labels2 = ['Median Poll (p50, ms)', 'Poll p95 (ms)', 'Upload Median (ms)']
 val_2w_2 = [23, 65, 210]
 val_4w_2 = [31, 83, 280]

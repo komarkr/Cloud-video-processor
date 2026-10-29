@@ -60,7 +60,6 @@ def test_e2e_all_four_operations(user1, db_session):
     assert os.path.exists(video_path)
     assert os.path.exists(watermark_path)
 
-    # 1. Operation: Convert
     with open(video_path, "rb") as vf:
         resp_conv = user1.post(
             "/api/tasks",
@@ -74,7 +73,6 @@ def test_e2e_all_four_operations(user1, db_session):
     assert t_conv.status == TaskStatus.done
     assert os.path.exists(t_conv.output_file)
 
-    # 2. Operation: Scale (720p)
     with open(video_path, "rb") as vf:
         resp_scale = user1.post(
             "/api/tasks",
@@ -88,7 +86,6 @@ def test_e2e_all_four_operations(user1, db_session):
     assert t_scale.status == TaskStatus.done
     assert os.path.exists(t_scale.output_file)
 
-    # 3. Operation: Watermark
     with open(video_path, "rb") as vf, open(watermark_path, "rb") as lf:
         resp_wm = user1.post(
             "/api/tasks",
@@ -108,7 +105,6 @@ def test_e2e_all_four_operations(user1, db_session):
     assert t_wm.status == TaskStatus.done
     assert os.path.exists(t_wm.output_file)
 
-    # 4. Operation: Audio Extract (.mp3)
     with open(video_path, "rb") as vf:
         resp_audio = user1.post(
             "/api/tasks",
@@ -123,7 +119,6 @@ def test_e2e_all_four_operations(user1, db_session):
     assert t_audio.output_file.endswith(".mp3")
     assert os.path.exists(t_audio.output_file)
 
-    # 5. Operation: Audio Mute (.mp4)
     with open(video_path, "rb") as vf:
         resp_mute = user1.post(
             "/api/tasks",
@@ -138,7 +133,6 @@ def test_e2e_all_four_operations(user1, db_session):
     assert t_mute.output_file.endswith(".mp4")
     assert os.path.exists(t_mute.output_file)
 
-    # Clean up output and input files
     for t in [t_conv, t_scale, t_wm, t_audio, t_mute]:
         if os.path.exists(t.input_file):
             os.remove(t.input_file)
@@ -152,7 +146,6 @@ def test_e2e_cancellation_flow(user1, db_session):
     """End-to-end test of cancellation of queued task and running task."""
     video_path = os.path.join(FIXTURES_DIR, "test_5s.mp4")
 
-    # 1. Cancel Queued Task
     with open(video_path, "rb") as vf:
         resp = user1.post(
             "/api/tasks",
@@ -179,19 +172,16 @@ def test_e2e_erroneous_videos_validation(user1):
     too_long = os.path.join(FIXTURES_DIR, "test_150s.mp4")
     video_path = os.path.join(FIXTURES_DIR, "test_5s.mp4")
 
-    # 1. Non-video file -> 422
     with open(not_a_video, "rb") as f:
         resp = user1.post("/api/tasks", files={"file": ("not_a_video.mp4", f, "video/mp4")})
     assert resp.status_code == 422
     assert "validation failed" in resp.json()["detail"].lower() or "corrupt" in resp.json()["detail"].lower()
 
-    # 2. Too long video (150s > 120s) -> 422
     with open(too_long, "rb") as f:
         resp = user1.post("/api/tasks", files={"file": ("test_150s.mp4", f, "video/mp4")})
     assert resp.status_code == 422
     assert "exceeds maximum allowed 120" in resp.json()["detail"].lower()
 
-    # 3. Watermark without logo file -> 422
     with open(video_path, "rb") as f:
         resp = user1.post("/api/tasks", data={"operation_type": "watermark"}, files={"file": ("test_5s.mp4", f, "video/mp4")})
     assert resp.status_code == 422
@@ -202,25 +192,20 @@ def test_e2e_stranger_task_isolation_404(user1, user2, db_session):
     """End-to-end test verifying stranger tasks return 404 for events, download, and delete."""
     video_path = os.path.join(FIXTURES_DIR, "test_5s.mp4")
 
-    # User 1 creates a task
     with open(video_path, "rb") as vf:
         resp = user1.post("/api/tasks", files={"file": ("test_5s.mp4", vf, "video/mp4")})
     assert resp.status_code == 201
     task_id = resp.json()["id"]
 
-    # User 2 tries to access User 1's task events -> 404
     resp_events = user2.get(f"/api/tasks/{task_id}/events")
     assert resp_events.status_code == 404
 
-    # User 2 tries to download User 1's task -> 404
     resp_download = user2.get(f"/api/tasks/{task_id}/download")
     assert resp_download.status_code == 404
 
-    # User 2 tries to delete User 1's task -> 404
     resp_delete = user2.delete(f"/api/tasks/{task_id}")
     assert resp_delete.status_code == 404
 
-    # Clean up
     t = db_session.query(Task).filter(Task.id == uuid.UUID(task_id)).first()
     if t and os.path.exists(t.input_file):
         os.remove(t.input_file)
@@ -230,7 +215,6 @@ def test_e2e_active_tasks_limit_429(user1, db_session):
     """End-to-end test verifying limit of 5 active tasks (MAX_ACTIVE_TASKS) returns 429."""
     video_path = os.path.join(FIXTURES_DIR, "test_5s.mp4")
 
-    # Create 5 active queued tasks for user1
     task_ids = []
     for i in range(5):
         t = Task(
@@ -244,13 +228,11 @@ def test_e2e_active_tasks_limit_429(user1, db_session):
         task_ids.append(t.id)
     db_session.commit()
 
-    # Attempting to upload 6th task must fail with 429 Too Many Requests
     with open(video_path, "rb") as vf:
         resp = user1.post("/api/tasks", files={"file": ("test_5s.mp4", vf, "video/mp4")})
     assert resp.status_code == 429
     assert "active tasks limit exceeded" in resp.json()["detail"].lower()
 
-    # Clean up dummy tasks
     for tid in task_ids:
         dt = db_session.query(Task).filter(Task.id == tid).first()
         if dt:

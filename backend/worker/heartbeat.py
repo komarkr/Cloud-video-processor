@@ -55,7 +55,6 @@ def _heartbeat_loop(stop_event: threading.Event) -> None:
     key = f"hb:{hostname}"
     legacy_key = f"worker:heartbeat:{hostname}"
 
-    # Initialize psutil cpu percent measurement
     try:
         psutil.cpu_percent(interval=None)
     except Exception:
@@ -79,7 +78,6 @@ def _heartbeat_loop(stop_event: threading.Event) -> None:
                 },
             )
             r.expire(key, 10)
-            # Legacy heartbeat key for compatibility
             r.set(legacy_key, 1, ex=10)
         except Exception as exc:
             logger.warning("Worker heartbeat write failed: %s", exc)

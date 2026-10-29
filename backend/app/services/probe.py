@@ -43,7 +43,6 @@ def get_ffprobe_executable() -> str:
     if which_path:
         return which_path
 
-    # Check Windows WinGet or Chocolatey paths
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     if local_app_data:
         winget_dir = os.path.join(local_app_data, "Microsoft", "WinGet", "Packages")
@@ -52,7 +51,6 @@ def get_ffprobe_executable() -> str:
                 if "ffprobe.exe" in files:
                     return os.path.join(root, "ffprobe.exe")
 
-    # Fallback to default name (will work inside Docker / linux path)
     return "ffprobe"
 
 
@@ -124,7 +122,6 @@ def probe_video(file_path: str) -> VideoProbeResult:
             status_code=422,
         )
 
-    # 1. Format check
     format_name_raw = format_info.get("format_name", "").lower()
     detected_formats = {fmt.strip() for fmt in format_name_raw.split(",") if fmt.strip()}
     if not (detected_formats & ALLOWED_FORMATS):
@@ -134,7 +131,6 @@ def probe_video(file_path: str) -> VideoProbeResult:
             status_code=422,
         )
 
-    # 2. Video stream presence check
     video_streams = [s for s in streams if s.get("codec_type") == "video"]
     if not video_streams:
         raise VideoValidationError(
@@ -144,7 +140,6 @@ def probe_video(file_path: str) -> VideoProbeResult:
 
     vstream = video_streams[0]
 
-    # 3. Resolution check (<= 1920x1080)
     try:
         width = int(vstream.get("width") or 0)
         height = int(vstream.get("height") or 0)
@@ -163,7 +158,6 @@ def probe_video(file_path: str) -> VideoProbeResult:
             status_code=422,
         )
 
-    # 4. Duration check (<= 120 s)
     duration_val = format_info.get("duration") or vstream.get("duration")
     if not duration_val:
         raise VideoValidationError(

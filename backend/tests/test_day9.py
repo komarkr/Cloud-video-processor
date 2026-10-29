@@ -89,7 +89,6 @@ def test_estimate_wait_sec_calculation(db_session):
 
     base_time = datetime.now(timezone.utc)
 
-    # 1 running task with 50% progress
     t_running = Task(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -101,7 +100,6 @@ def test_estimate_wait_sec_calculation(db_session):
     )
     mock_r.hset(f"task:{t_running.id}", "progress", 50)
 
-    # 1 queued task ahead
     t_ahead = Task(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -112,7 +110,6 @@ def test_estimate_wait_sec_calculation(db_session):
         created_at=base_time - timedelta(minutes=5),
     )
 
-    # The current task (position 2)
     t_curr = Task(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -126,10 +123,6 @@ def test_estimate_wait_sec_calculation(db_session):
     db_session.add_all([t_running, t_ahead, t_curr])
     db_session.commit()
 
-    # running_left = 60 * (1 - 0.5) = 30
-    # ahead = 60
-    # total wait numerator = 90
-    # speed = 1.0, workers = 2 -> 90 / 2 = 45 sec
     wait = estimate_wait_sec(db_session, mock_r, t_curr)
     assert wait == 45
 
@@ -145,7 +138,6 @@ def test_recent_speed_calculation(db_session):
     db_session.commit()
 
     now = datetime.now(timezone.utc)
-    # Task took 30s to process a 60s video -> speed = 2.0
     t = Task(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -169,7 +161,6 @@ def test_queue_overflow_503_and_retry_after(client, monkeypatch, db_session):
     db_session.query(Task).delete()
     db_session.commit()
 
-    # Login user
     client.post(
         "/api/auth/register",
         json={"email": "overflow@example.com", "password": "password123"},
@@ -180,11 +171,9 @@ def test_queue_overflow_503_and_retry_after(client, monkeypatch, db_session):
     )
     assert login_resp.status_code == 200
 
-    # Set MAX_QUEUE to 1
     monkeypatch.setattr(settings, "max_queue", 1)
 
     user = db_session.query(User).filter(User.email == "overflow@example.com").first()
-    # Create 1 queued task to fill the queue
     existing = Task(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -196,7 +185,6 @@ def test_queue_overflow_503_and_retry_after(client, monkeypatch, db_session):
     db_session.add(existing)
     db_session.commit()
 
-    # Mock probe_video so upload proceeds to queue check
     from app.services.probe import VideoProbeResult
     mock_res = VideoProbeResult(
         duration=15.0,
@@ -224,7 +212,6 @@ def test_api_returns_queue_position_and_eta(client, monkeypatch, db_session):
     db_session.query(Task).delete()
     db_session.commit()
 
-    # Register and login
     client.post(
         "/api/auth/register",
         json={"email": "eta_api@example.com", "password": "password123"},
@@ -257,7 +244,6 @@ def test_api_returns_queue_position_and_eta(client, monkeypatch, db_session):
     assert task_data["eta_sec"] is not None
     assert task_data["duration_sec"] == 25.0
 
-    # Test GET /api/tasks
     list_res = client.get("/api/tasks")
     assert list_res.status_code == 200
     my_tasks = list_res.json()
@@ -266,7 +252,6 @@ def test_api_returns_queue_position_and_eta(client, monkeypatch, db_session):
     assert found["queue_position"] == 1
     assert found["eta_sec"] is not None
 
-    # Test GET /api/tasks/{task_id}
     detail_res = client.get(f"/api/tasks/{task_data['id']}")
     assert detail_res.status_code == 200
     detail = detail_res.json()

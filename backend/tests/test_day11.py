@@ -26,7 +26,6 @@ def test_admin_overview_forbidden_for_regular_user(client, db_session):
 
 def test_admin_overview_success(client, db_session, monkeypatch):
     """GET /api/admin/overview with admin user returns 200 and complete cluster metrics."""
-    # Ensure admin user exists and login
     admin_email = "admin_day11@example.com"
     admin_pw = "admin_secret_123"
 
@@ -41,7 +40,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
         db_session.add(admin)
         db_session.commit()
 
-    # Create regular user with tasks
     reg_user = User(
         id=uuid.uuid4(),
         email="client_video@example.com",
@@ -51,7 +49,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
     db_session.add(reg_user)
     db_session.commit()
 
-    # Pre-seed tasks of various statuses
     t_queued = Task(
         id=uuid.uuid4(),
         user_id=reg_user.id,
@@ -85,7 +82,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
     db_session.add_all([t_queued, t_running, t_done])
     db_session.commit()
 
-    # Mock Redis with worker heartbeat and autoscaler event
     mock_r = FakeRedis()
     mock_r.hset(
         "hb:worker-node-1",
@@ -110,7 +106,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
     import redis
     monkeypatch.setattr(redis.Redis, "from_url", lambda *args, **kwargs: mock_r)
 
-    # Login as admin
     login_resp = client.post("/api/auth/login", json={"email": admin_email, "password": admin_pw})
     assert login_resp.status_code == 200
 
@@ -125,7 +120,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
     assert data["status_counts"]["done"] >= 1
     assert data["queue_length"] >= 1
 
-    # Check workers
     assert len(data["workers"]) >= 1
     w = next((w for w in data["workers"] if w["hostname"] == "worker-node-1"), None)
     assert w is not None
@@ -133,7 +127,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
     assert w["ram"] == 55.0
     assert w["current_task"] == str(t_running.id)
 
-    # Check recent tasks list
     assert len(data["recent_tasks"]) >= 3
     found_task = next((t for t in data["recent_tasks"] if t["id"] == str(t_running.id)), None)
     assert found_task is not None
@@ -141,7 +134,6 @@ def test_admin_overview_success(client, db_session, monkeypatch):
     assert found_task["operation_type"] == "scale"
     assert found_task["worker_id"] == "worker-node-1"
 
-    # Check autoscaler events
     assert len(data["autoscaler_events"]) >= 1
     assert data["autoscaler_events"][0]["action"] == "scale_up"
 
@@ -177,12 +169,10 @@ def test_admin_cancel_any_task(client, db_session):
     db_session.add(task)
     db_session.commit()
 
-    # Regular user cannot use admin cancel endpoint
     client.post("/api/auth/login", json={"email": "victim@example.com", "password": "user_pass_123"})
     forbidden_resp = client.post(f"/api/admin/tasks/{task.id}/cancel")
     assert forbidden_resp.status_code == 403
 
-    # Admin cancels task
     client.post("/api/auth/login", json={"email": admin_email, "password": admin_pw})
     cancel_resp = client.post(f"/api/admin/tasks/{task.id}/cancel")
     assert cancel_resp.status_code == 200
@@ -192,6 +182,5 @@ def test_admin_cancel_any_task(client, db_session):
     assert task.status == TaskStatus.cancelled
     assert "cancelled by administrator" in task.error_message.lower()
 
-    # Cancelling an already cancelled task returns 400
     err_resp = client.post(f"/api/admin/tasks/{task.id}/cancel")
     assert err_resp.status_code == 400

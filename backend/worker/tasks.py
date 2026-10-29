@@ -56,7 +56,6 @@ def get_ffmpeg_executable() -> str:
     if which_path:
         return which_path
 
-    # Check Windows WinGet or Chocolatey installation
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     if local_app_data:
         winget_dir = os.path.join(local_app_data, "Microsoft", "WinGet", "Packages")
@@ -65,7 +64,6 @@ def get_ffmpeg_executable() -> str:
                 if "ffmpeg.exe" in files:
                     return os.path.join(root, "ffmpeg.exe")
 
-    # Fallback to imageio-ffmpeg if installed
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
@@ -238,7 +236,6 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
     elif op in ["audio", "extract_audio", "mute", "mute_audio", "remove_audio"]:
         action = params.get("action", "").lower()
         if action in ["mute", "remove"] or op in ["mute", "mute_audio", "remove_audio"]:
-            # Mute audio, copy video stream
             return [
                 "-protocol_whitelist",
                 "file",
@@ -250,7 +247,6 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
                 output_path,
             ]
         else:
-            # Extract audio to MP3 using libmp3lame
             return [
                 "-protocol_whitelist",
                 "file",
@@ -265,7 +261,6 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             ]
 
     else:
-        # Default convert operation
         return [
             "-protocol_whitelist",
             "file",
@@ -311,7 +306,6 @@ def process_task(task_id: str):
         ext = get_output_extension(task)
         output_path = os.path.join(settings.output_dir, f"{task_id}{ext}")
 
-        # Check pre-cancellation
         if task.status == TaskStatus.cancelled or r.exists(f"cancel:{task_id}"):
             task.status = TaskStatus.cancelled
             task.finished_at = datetime.now(timezone.utc)
@@ -320,12 +314,10 @@ def process_task(task_id: str):
             logger.info("[worker_id=%s task_id=%s] Task was cancelled before processing.", worker_id, task_id)
             return
 
-        # Check available disk storage
         disk_info = shutil.disk_usage(settings.output_dir)
-        if disk_info.free < 50 * 1024 * 1024:  # At least 50 MB required
+        if disk_info.free < 50 * 1024 * 1024:
             raise RuntimeError("Insufficient server disk space for processing.")
 
-        # Transition to running
         started_at = datetime.now(timezone.utc)
         task.status = TaskStatus.running
         task.started_at = started_at
@@ -353,7 +345,6 @@ def process_task(task_id: str):
             task.operation_type,
         )
 
-        # Get video duration for progress calculation
         total_sec = 1.0
         try:
             probe_res = probe_video(task.input_file)
@@ -364,7 +355,6 @@ def process_task(task_id: str):
         except Exception as e:
             logger.warning("[worker_id=%s task_id=%s] Could not probe video duration: %s", worker_id, task_id, e)
 
-        # Verify audio stream exists if operation is audio extraction
         op = (task.operation_type or "convert").lower()
         params = task.params or {}
         if op in ["extract_audio", "extract"] or (op == "audio" and params.get("action") not in ["mute", "remove"]):
@@ -376,13 +366,10 @@ def process_task(task_id: str):
             except Exception as e:
                 raise RuntimeError(str(e))
 
-        # Build FFmpeg command arguments
         args = build_ffmpeg_args(task, output_path)
 
-        # Run FFmpeg with progress
         run_ffmpeg(task_id, args, total_sec, r)
 
-        # Complete task
         finished_at = datetime.now(timezone.utc)
         expires_at = finished_at + timedelta(hours=settings.result_lifetime_hours)
         task.status = TaskStatus.done

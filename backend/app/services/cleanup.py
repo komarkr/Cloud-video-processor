@@ -52,7 +52,6 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
             task.expires_at,
         )
 
-        # 1. Delete input file
         if task.input_file and _is_safe_data_path(task.input_file) and os.path.exists(task.input_file):
             try:
                 os.remove(task.input_file)
@@ -64,7 +63,6 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
                     e,
                 )
 
-        # 2. Delete output file
         if task.output_file and _is_safe_data_path(task.output_file) and os.path.exists(task.output_file):
             try:
                 os.remove(task.output_file)
@@ -76,7 +74,6 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
                     e,
                 )
 
-        # 3. Delete logo file if watermark task
         if task.params and isinstance(task.params, dict):
             logo_path = task.params.get("logo_path")
             if logo_path and _is_safe_data_path(logo_path) and os.path.exists(logo_path):
@@ -90,7 +87,6 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
                         e,
                     )
 
-        # 4. Delete log file
         log_file = os.path.join(settings.log_dir, f"{task_id}.log")
         if os.path.exists(log_file):
             try:
@@ -103,7 +99,6 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
                     e,
                 )
 
-        # 5. Delete Redis cache keys
         if r:
             try:
                 r.delete(f"task:{task_id}", f"cancel:{task_id}")
@@ -114,7 +109,6 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
                     e,
                 )
 
-        # 6. Delete task from database
         db.delete(task)
         count += 1
 

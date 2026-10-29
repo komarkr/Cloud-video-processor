@@ -98,7 +98,6 @@ async def add_x_served_by_header(request: Request, call_next):
     return response
 
 
-# Register routers
 app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(autoscaler_router)

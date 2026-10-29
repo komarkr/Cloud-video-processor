@@ -15,7 +15,6 @@ def get_current_user(
     """Retrieve the authenticated user from HttpOnly cookie or Authorization header."""
     token = request.cookies.get("access_token")
 
-    # Fallback to Authorization header if cookie is missing
     if not token:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
@@ -71,5 +70,4 @@ def require_admin(
     return user
 
 
-# Shorthand alias
 current_user = get_current_user

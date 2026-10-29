@@ -27,7 +27,6 @@ def test_ffmpeg_protocol_whitelist_in_arguments():
     assert args[idx + 1] == "file"
     assert args[idx + 2] == "-i"
 
-    # Watermark test
     wm_task = Task(
         id=uuid.uuid4(),
         operation_type="watermark",
@@ -35,7 +34,6 @@ def test_ffmpeg_protocol_whitelist_in_arguments():
         input_file="/data/uploads/test.mp4",
     )
     wm_args = build_ffmpeg_args(wm_task, "/data/outputs/wm.mp4")
-    # Should have two -protocol_whitelist file entries (video and logo)
     count = wm_args.count("-protocol_whitelist")
     assert count == 2
 
@@ -49,13 +47,11 @@ def test_upload_filename_sanitization_uuid_only(client: TestClient, db_session):
     client.post("/api/auth/register", json={"email": email, "password": "password123"})
     client.post("/api/auth/login", json={"email": email, "password": "password123"})
 
-    # Attempt path traversal in filename
     client.post(
         "/api/tasks",
         files={"file": ("../../../../etc/passwd.exe", io.BytesIO(small_content), "video/mp4")},
         data={"operation_type": "convert"},
     )
-    # Check that no file named passwd.exe or traversal was created
     assert not os.path.exists(os.path.join(settings.upload_dir, "passwd.exe"))
     assert not os.path.exists("passwd.exe")
 
@@ -68,11 +64,9 @@ def test_owner_verification_across_endpoints(client: TestClient, db_session):
     client.post("/api/auth/register", json={"email": user1_email, "password": "password123"})
     client.post("/api/auth/register", json={"email": user2_email, "password": "password123"})
 
-    # Login as User 1 to get user ID
     client.post("/api/auth/login", json={"email": user1_email, "password": "password123"})
     u1 = db_session.query(User).filter(User.email == user1_email).first()
 
-    # Create task owned by User 1
     task1 = Task(
         id=uuid.uuid4(),
         user_id=u1.id,
@@ -83,30 +77,23 @@ def test_owner_verification_across_endpoints(client: TestClient, db_session):
     db_session.add(task1)
     db_session.commit()
 
-    # User 1 CAN view task1
     r_owner = client.get(f"/api/tasks/{task1.id}")
     assert r_owner.status_code == 200
 
-    # Now login as User 2 (intruder)
     client.post("/api/auth/login", json={"email": user2_email, "password": "password123"})
 
-    # User 2 tries to GET task1 -> 403 Forbidden
     r_get = client.get(f"/api/tasks/{task1.id}")
     assert r_get.status_code == 403
 
-    # User 2 tries to cancel task1 -> 403 Forbidden
     r_cancel = client.post(f"/api/tasks/{task1.id}/cancel")
     assert r_cancel.status_code == 403
 
-    # User 2 tries to delete task1 -> 404 (hidden for privacy)
     r_del = client.delete(f"/api/tasks/{task1.id}")
     assert r_del.status_code == 404
 
-    # User 2 tries to download task1 -> 404
     r_dl = client.get(f"/api/tasks/{task1.id}/download")
     assert r_dl.status_code == 404
 
-    # Clean up
     db_session.delete(task1)
     db_session.commit()
 
@@ -132,7 +119,6 @@ def test_cleanup_expired_tasks_and_files(db_session):
 
     now = datetime.now(timezone.utc)
 
-    # 1. Expired task
     exp_task_id = uuid.uuid4()
     exp_input = os.path.join(settings.upload_dir, f"{exp_task_id}.mp4")
     exp_output = os.path.join(settings.output_dir, f"{exp_task_id}.mp4")
@@ -158,7 +144,6 @@ def test_cleanup_expired_tasks_and_files(db_session):
     )
     db_session.add(expired_task)
 
-    # 2. Valid (non-expired) task
     valid_task_id = uuid.uuid4()
     valid_input = os.path.join(settings.upload_dir, f"{valid_task_id}.mp4")
     with open(valid_input, "w") as f:
@@ -175,25 +160,20 @@ def test_cleanup_expired_tasks_and_files(db_session):
     db_session.add(valid_task)
     db_session.commit()
 
-    # Run cleanup
     purged = cleanup_expired_tasks(db_session, fake_redis)
     assert purged >= 1
 
-    # Verify expired task files were deleted
     assert not os.path.exists(exp_input)
     assert not os.path.exists(exp_output)
     assert not os.path.exists(exp_log)
 
-    # Verify expired task was deleted from database
     check_expired = db_session.query(Task).filter(Task.id == exp_task_id).first()
     assert check_expired is None
 
-    # Verify valid task is STILL present
     check_valid = db_session.query(Task).filter(Task.id == valid_task_id).first()
     assert check_valid is not None
     assert os.path.exists(valid_input)
 
-    # Clean up valid task files
     if os.path.exists(valid_input):
         os.remove(valid_input)
     db_session.delete(valid_task)
@@ -219,7 +199,6 @@ def test_admin_cleanup_endpoint(client: TestClient, db_session, monkeypatch):
     fake_redis = FakeRedis()
     monkeypatch.setattr("redis.Redis.from_url", lambda *args, **kwargs: fake_redis)
 
-    # Login as admin
     client.post("/api/auth/login", json={"email": admin_email, "password": admin_pw})
 
     response = client.post("/api/admin/cleanup")
@@ -236,23 +215,19 @@ def test_arbitrary_file_deletion_via_logo_path_prevented(client: TestClient, db_
     in params['logo_path'] to trigger deletion of sensitive files on disk
     via create_task, delete_task, or cleanup_expired_tasks.
     """
-    # 1. Create a dummy sensitive file outside the data directories
     sensitive_file = tmp_path / "sensitive_app_file.py"
     sensitive_file.write_text("# SENSITIVE CODE DO NOT DELETE")
     assert sensitive_file.exists()
 
-    # Register & Login
     attacker_email = "attacker@example.com"
     client.post("/api/auth/register", json={"email": attacker_email, "password": "password123"})
     client.post("/api/auth/login", json={"email": attacker_email, "password": "password123"})
     attacker = db_session.query(User).filter(User.email == attacker_email).first()
 
-    # Mock video validation to succeed
     from unittest.mock import MagicMock
     mock_probe = MagicMock(duration=5.0, width=1280, height=720, format_name="mp4")
     monkeypatch.setattr("app.routers.tasks.probe_video", lambda p: mock_probe)
 
-    # 2. Attempt to inject logo_path pointing to sensitive file via create_task
     import json
     malicious_params = json.dumps({"logo_path": str(sensitive_file), "custom_opt": 123})
     res = client.post(
@@ -263,13 +238,11 @@ def test_arbitrary_file_deletion_via_logo_path_prevented(client: TestClient, db_
     assert res.status_code == 201
     created_task_id = res.json()["id"]
 
-    # Verify task in DB: logo_path MUST be popped/stripped!
     db_task = db_session.query(Task).filter(Task.id == uuid.UUID(created_task_id)).first()
     assert db_task is not None
     assert "logo_path" not in (db_task.params or {})
     assert sensitive_file.exists()
 
-    # 3. Simulate existing task with malicious logo_path directly in DB
     evil_task_id = uuid.uuid4()
     evil_task = Task(
         id=evil_task_id,
@@ -282,14 +255,11 @@ def test_arbitrary_file_deletion_via_logo_path_prevented(client: TestClient, db_
     db_session.add(evil_task)
     db_session.commit()
 
-    # Call DELETE /api/tasks/{evil_task_id}
     del_res = client.delete(f"/api/tasks/{evil_task_id}")
     assert del_res.status_code == 200
 
-    # Sensitive file MUST NOT be deleted!
     assert sensitive_file.exists()
 
-    # 4. Test cleanup_expired_tasks safety with malicious logo_path
     expired_evil = Task(
         id=uuid.uuid4(),
         user_id=attacker.id,

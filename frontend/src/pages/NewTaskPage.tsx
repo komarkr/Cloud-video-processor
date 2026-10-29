@@ -10,13 +10,11 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [operationType, setOperationType] = useState<string>('convert');
 
-  // Operation parameters
   const [scaleResolution, setScaleResolution] = useState<string>('720');
   const [watermarkPosition, setWatermarkPosition] = useState<string>('bottom_right');
   const [watermarkOpacity, setWatermarkOpacity] = useState<number>(0.8);
   const [audioAction, setAudioAction] = useState<string>('extract');
 
-  // Metadata & Validation
   const [videoMeta, setVideoMeta] = useState<{ duration: number; width: number; height: number } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -30,7 +28,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
     setSubmitError(null);
     setVideoMeta(null);
 
-    // 1. Client-side size check (<= 100 MB)
     const maxBytes = 100 * 1024 * 1024;
     if (selectedFile.size > maxBytes) {
       setValidationError(
@@ -40,7 +37,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
       return;
     }
 
-    // 2. Client-side video metadata check using <video> element
     const video = document.createElement('video');
     video.preload = 'metadata';
     const objectUrl = URL.createObjectURL(selectedFile);
@@ -110,7 +106,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
     formData.append('file', file);
     formData.append('operation_type', operationType);
 
-    // Build operation-specific parameters
     let params: Record<string, any> = {};
     if (operationType === 'scale') {
       params = { resolution: parseInt(scaleResolution, 10) };
@@ -172,38 +167,7 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
           </div>
         )}
 
-        {/* Sample Demo Videos for Testing */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))',
-          border: '1px solid rgba(56, 189, 248, 0.25)',
-          borderRadius: '10px',
-          padding: '1rem',
-          marginBottom: '1.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#38bdf8', fontWeight: 600, fontSize: '0.95rem' }}>
-            <span>Готові зразки для тестування (натисніть, щоб завантажити на комп'ютер):</span>
-          </div>
-          <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '0 0 0.75rem 0' }}>
-            Завантажте ці файли, щоб побачити реальну зміну картинки, аудіо та помітне навантаження на воркери:
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <a href="/samples/fractal_universe_30s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              Фрактал (30 с, 1080p, аудіо)
-            </a>
-            <a href="/samples/cyber_particles_20s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              Кібер-геометрія (20 с, 1080p)
-            </a>
-            <a href="/samples/synthesizer_melody_25s.mp4" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              Синтезатор (25 с, аудіо)
-            </a>
-            <a href="/samples/watermark_logo.png" download className="nav-btn" style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}>
-              Фірмовий логотип (PNG)
-            </a>
-          </div>
-        </div>
-
         <form onSubmit={handleSubmit}>
-          {/* File Picker */}
           <label htmlFor="video-file-input">
             <strong>1. Виберіть відео</strong> (до 100 МБ, тривалість до 120 с, до 1080p)
             <input
@@ -221,7 +185,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             />
           </label>
 
-          {/* Client-side metadata preview */}
           {file && videoMeta && (
             <div className="file-meta-box">
               <div className="meta-row">
@@ -247,7 +210,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             </div>
           )}
 
-          {/* Operation Selector */}
           <label htmlFor="operation-select">
             <strong>2. Операція обробки</strong>
             <select
@@ -263,7 +225,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             </select>
           </label>
 
-          {/* Scale parameters */}
           {operationType === 'scale' && (
             <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
               <label htmlFor="scale-res-select">
@@ -283,7 +244,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             </div>
           )}
 
-          {/* Watermark parameters */}
           {operationType === 'watermark' && (
             <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
               <label htmlFor="logo-file-input">
@@ -336,7 +296,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             </div>
           )}
 
-          {/* Audio parameters */}
           {operationType === 'audio' && (
             <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
               <label htmlFor="audio-action-select">
@@ -354,7 +313,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             </div>
           )}
 
-          {/* Upload Progress Bar */}
           {uploadProgress !== null && (
             <div style={{ marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
@@ -365,7 +323,6 @@ export const NewTaskPage: React.FC<NewTaskPageProps> = ({ onTaskCreated }) => {
             </div>
           )}
 
-          {/* Submit button */}
           <button
             type="submit"
             aria-busy={submitting}

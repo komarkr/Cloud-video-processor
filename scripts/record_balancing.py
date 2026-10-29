@@ -16,13 +16,11 @@ output_lines.append(f"Date: 2026-10-24")
 output_lines.append("Test Target: Nginx Ingress (ports 80, 443), api1 (SERVER_ID=api1), api2 (SERVER_ID=api2)")
 output_lines.append("")
 
-# 1. HTTP to HTTPS 301
 output_lines.append("-" * 80)
 output_lines.append("1. HTTP to HTTPS 301 Redirect Check")
 output_lines.append("-" * 80)
 output_lines.append("$ curl -I http://localhost/api/health")
 stdout, _ = run_cmd(["curl.exe", "-I", "http://localhost/api/health"])
-# Filter out curl progress if any, extract HTTP response lines
 lines = [l.strip() for l in stdout.splitlines() if l.strip() and not l.strip().startswith("%") and not "Dload" in l]
 clean_headers = "\n".join(lines)
 output_lines.append(clean_headers)
@@ -30,7 +28,6 @@ output_lines.append("")
 output_lines.append("[RESULT]: HTTP successfully redirects to HTTPS with 301 Moved Permanently.")
 output_lines.append("")
 
-# 2. Alternation
 output_lines.append("-" * 80)
 output_lines.append("2. HTTPS Health Check & Upstream Alternation (api1 / api2 via least_conn)")
 output_lines.append("-" * 80)
@@ -58,7 +55,6 @@ for i in range(1, 7):
 output_lines.append("[RESULT]: Nginx distributes incoming HTTPS requests between api1 and api2 with X-Served-By header.")
 output_lines.append("")
 
-# 3. Failover
 output_lines.append("-" * 80)
 output_lines.append("3. High Availability / Failover Test: docker compose stop api1")
 output_lines.append("-" * 80)
@@ -90,14 +86,13 @@ for i in range(1, 5):
 output_lines.append("[RESULT]: Stopping api1 did not cause service degradation. All traffic automatically routed to api2.")
 output_lines.append("")
 
-# 4. Recover Node
 output_lines.append("-" * 80)
 output_lines.append("4. Recover Node: docker compose start api1")
 output_lines.append("-" * 80)
 output_lines.append("$ docker compose start api1")
 stdout, stderr = run_cmd(["docker", "compose", "start", "api1"])
 output_lines.append(stdout.strip() or stderr.strip())
-time.sleep(3)  # wait for healthcheck/socket ready
+time.sleep(3)
 output_lines.append("")
 output_lines.append("$ for i in {1..4}; do curl -k -i -s https://localhost/api/health | grep -E \"HTTP/|server_id|X-Served-By\"; done")
 output_lines.append("")
@@ -123,7 +118,6 @@ for i in range(1, 5):
 output_lines.append("[RESULT]: api1 re-entered the upstream pool and traffic balancing resumed.")
 output_lines.append("")
 
-# 5. Login
 output_lines.append("-" * 80)
 output_lines.append("5. User Login via Nginx with Secure HttpOnly Cookie")
 output_lines.append("-" * 80)
@@ -142,7 +136,6 @@ output_lines.append("")
 output_lines.append("[RESULT]: Login through Nginx succeeds and sets HttpOnly, Secure, SameSite=Lax cookie with X-Served-By header.")
 output_lines.append("")
 
-# 6. Rate Limiting
 output_lines.append("-" * 80)
 output_lines.append("6. Rate Limiting on /api/auth/ (limit_req)")
 output_lines.append("-" * 80)

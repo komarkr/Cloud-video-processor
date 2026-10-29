@@ -57,10 +57,8 @@ def test_process_task_convert_success(db_session, auth_client):
     db_session.add(task)
     db_session.commit()
 
-    # Run worker task synchronously
     process_task(str(task_id))
 
-    # Verify task in DB
     db_session.expire_all()
     updated = db_session.query(Task).filter(Task.id == task_id).first()
     assert updated.status == TaskStatus.done
@@ -70,12 +68,10 @@ def test_process_task_convert_success(db_session, auth_client):
     assert updated.finished_at is not None
     assert updated.worker_id is not None
 
-    # Verify output video is valid
     probe_res = probe_video(updated.output_file)
     assert probe_res.duration > 0
     assert probe_res.width > 0
 
-    # Clean up generated output file
     if os.path.exists(updated.output_file):
         os.remove(updated.output_file)
 
@@ -97,7 +93,6 @@ def test_process_task_scale_success(db_session, auth_client):
     db_session.add(task)
     db_session.commit()
 
-    # Run worker task synchronously
     process_task(str(task_id))
 
     db_session.expire_all()
@@ -106,7 +101,6 @@ def test_process_task_scale_success(db_session, auth_client):
     assert updated.output_file is not None
     assert os.path.exists(updated.output_file)
 
-    # Verify scaled resolution is height 360
     probe_res = probe_video(updated.output_file)
     assert probe_res.height == 360
 
@@ -208,7 +202,6 @@ def test_cancel_endpoint_forbidden_for_non_owner(auth_client, client, db_session
     db_session.add(task)
     db_session.commit()
 
-    # Another user logs in
     client.post("/api/register", json={"email": "attacker@example.com", "password": "password123"})
     client.post("/api/login", json={"email": "attacker@example.com", "password": "password123"})
 

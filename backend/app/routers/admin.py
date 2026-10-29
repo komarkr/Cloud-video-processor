@@ -35,7 +35,6 @@ def get_admin_overview(
     4. Recent 50 tasks (user email, operation, status, progress, worker/server, duration)
     5. Recent autoscaler scaling events
     """
-    # 1. Status counts
     counts = {
         "queued": db.query(Task).filter(Task.status == TaskStatus.queued).count(),
         "running": db.query(Task).filter(Task.status == TaskStatus.running).count(),
@@ -46,7 +45,6 @@ def get_admin_overview(
     counts["total"] = sum(counts.values())
     queue_length = counts["queued"]
 
-    # Redis connection for heartbeats, progress, and autoscaler logs
     try:
         r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     except Exception as exc:
@@ -55,7 +53,6 @@ def get_admin_overview(
 
     now = datetime.now(timezone.utc)
 
-    # 2. Worker heartbeats
     workers: List[Dict[str, Any]] = []
     if r:
         try:
@@ -107,7 +104,6 @@ def get_admin_overview(
         except Exception as exc:
             logger.warning("Error fetching heartbeats from Redis: %s", exc)
 
-    # 3. Recent 50 tasks
     recent_tasks: List[Dict[str, Any]] = []
     try:
         recent = (
@@ -156,7 +152,6 @@ def get_admin_overview(
     except Exception as exc:
         logger.warning("Error querying recent tasks for admin: %s", exc)
 
-    # 4. Autoscaler events
     autoscaler_events: List[Dict[str, Any]] = []
     if r:
         try:

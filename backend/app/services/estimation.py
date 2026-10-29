@@ -13,19 +13,16 @@ def alive_workers(r: Optional[redis.Redis] = None) -> int:
     """Determine the number of currently active/healthy workers."""
     if r:
         try:
-            # 1. Check Redis worker heartbeats (hb:*)
             hb_keys = r.keys("hb:*")
             if hb_keys:
                 return len(hb_keys)
 
-            # 2. Check legacy heartbeat keys if any
             heartbeats = r.keys("worker:heartbeat:*")
             if heartbeats:
                 return len(heartbeats)
         except Exception:
             pass
 
-    # 2. Try Celery ping with short timeout
     try:
         from worker.app import celery_app
         insp = celery_app.control.inspect(timeout=0.2)
@@ -35,7 +32,6 @@ def alive_workers(r: Optional[redis.Redis] = None) -> int:
     except Exception:
         pass
 
-    # Default fallback: at least 1 worker
     return 1
 
 

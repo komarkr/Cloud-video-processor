@@ -43,7 +43,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
   useEffect(() => {
     fetchTasks();
 
-    // Polling fallback every 2 seconds for active tasks
     const interval = setInterval(() => {
       tasksApi
         .list()
@@ -68,13 +67,11 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
 
     return () => {
       clearInterval(interval);
-      // Close all active SSE connections on unmount
       activeSseMap.current.forEach((es) => es.close());
       activeSseMap.current.clear();
     };
   }, []);
 
-  // Set up live SSE streams for queued and running tasks
   useEffect(() => {
     const activeTasks = tasks.filter((t) => t.status === 'queued' || t.status === 'running');
 
@@ -97,7 +94,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                       queue_position: payload.queue_position !== undefined ? payload.queue_position : t.queue_position,
                       eta_sec: payload.eta_sec !== undefined ? payload.eta_sec : t.eta_sec,
                     };
-                    // Keep modal in sync if open
                     if (selectedTask && selectedTask.id === task.id) {
                       setSelectedTask(updated);
                     }
@@ -110,7 +106,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
               if (payload.status === 'done' || payload.status === 'failed' || payload.status === 'cancelled') {
                 es.close();
                 activeSseMap.current.delete(task.id);
-                // Refresh task record for output_file, finished_at, error_message
                 tasksApi.get(task.id).then((fresh) => {
                   setTasks((curr) =>
                     curr.map((c) => (c.id === task.id ? { ...fresh, progress: 100 } : c))
@@ -383,7 +378,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div className="action-btn-group" style={{ justifyContent: 'flex-end' }}>
-                        {/* Details / Preview modal button */}
                         <button
                           type="button"
                           className="action-btn"
@@ -394,7 +388,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                           {task.status === 'done' ? 'Перегляд' : 'Деталі'}
                         </button>
 
-                        {/* Download button for completed task */}
                         {task.status === 'done' && (
                           <a
                             href={tasksApi.getDownloadUrl(task.id)}
@@ -406,7 +399,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                           </a>
                         )}
 
-                        {/* Cancel button for active task */}
                         {(task.status === 'queued' || task.status === 'running') && (
                           <button
                             type="button"
@@ -418,7 +410,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
                           </button>
                         )}
 
-                        {/* Delete button */}
                         <button
                           type="button"
                           className="action-btn delete"
@@ -437,7 +428,6 @@ export const TaskListPage: React.FC<TaskListPageProps> = ({ onGoToNewTask }) => 
         </article>
       )}
 
-      {/* Task Details & Video Preview Modal */}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}

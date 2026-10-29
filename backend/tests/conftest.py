@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Ensure backend directory is in sys.path
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
@@ -215,7 +214,6 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Pre-seed admin user into test database session
     admin = db_session.query(User).filter(User.email == settings.admin_email).first()
     if not admin:
         admin = User(

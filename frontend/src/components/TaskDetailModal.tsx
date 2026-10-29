@@ -110,7 +110,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       return parts.length > 0 ? parts.join(', ') : 'Без додаткових фільтрів';
     }
 
-    // Generic fallback: format key-values cleanly, skipping internal server paths
     const filtered = Object.entries(p)
       .filter(([key]) => key !== 'logo_path' && key !== 'raw')
       .map(([key, val]) => `${key}: ${val}`);
@@ -136,7 +135,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </button>
         </header>
 
-        {/* Status Badge */}
         <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <strong>Статус:</strong>
           <span className={`status-badge ${task.status}`}>
@@ -157,7 +155,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           )}
         </div>
 
-        {/* Queued notification banner */}
         {task.status === 'queued' && (
           <div className="file-meta-box" style={{ marginBottom: '1.25rem', borderColor: 'rgba(56, 189, 248, 0.4)' }}>
             <h4 style={{ color: '#38bdf8', fontSize: '0.95rem', margin: '0 0 0.4rem' }}>
@@ -174,7 +171,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         )}
 
-        {/* Error message box if failed */}
         {task.status === 'failed' && task.error_message && (
           <div className="file-meta-box error" style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ color: '#f87171', fontSize: '0.95rem', margin: '0 0 0.5rem' }}>
@@ -186,7 +182,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         )}
 
-        {/* Video / Audio Preview if Done */}
         {task.status === 'done' && (
           <div style={{ marginBottom: '1.5rem', background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '10px' }}>
             <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#38bdf8' }}>
@@ -208,7 +203,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         )}
 
-        {/* Metadata Details Grid */}
         <div className="file-meta-box" style={{ marginBottom: '1.5rem' }}>
           <div className="meta-row">
             <span>Операція:</span>
@@ -270,7 +264,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           )}
         </div>
 
-        {/* Footer Actions */}
         <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
           {task.status === 'done' && (
             <a href={downloadUrl} download className="action-btn download">

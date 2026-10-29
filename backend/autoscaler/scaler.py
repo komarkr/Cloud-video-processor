@@ -192,7 +192,6 @@ class Autoscaler:
         stopped_count = 0
         current_worker_ids = {w.id for w in workers if hasattr(w, "id")}
 
-        # Clean up stale IDs from idle tracker
         for tracked_id in list(self.idle_since.keys()):
             if tracked_id not in current_worker_ids:
                 del self.idle_since[tracked_id]
@@ -202,11 +201,9 @@ class Autoscaler:
 
         for w in list(workers):
             labels = getattr(w, "labels", {}) or {}
-            # Only consider workers that were dynamically created by autoscaler
             if labels.get("cvp.autoscaled") != "1":
                 continue
 
-            # Cannot scale down below MIN_WORKERS
             if total_workers - stopped_count <= self.min_workers:
                 break
 
@@ -214,11 +211,9 @@ class Autoscaler:
             w_id = getattr(w, "id", str(id(w)))
 
             if busy:
-                # Worker is busy, reset idle timer
                 self.idle_since.pop(w_id, None)
                 continue
 
-            # Worker is idle without an active task
             if w_id not in self.idle_since:
                 self.idle_since[w_id] = now
             else:
@@ -264,7 +259,6 @@ class Autoscaler:
         n = len(workers)
         action_taken = "none"
 
-        # Scale up check
         if queued > n * self.per_worker and n < self.max_workers:
             image, network, media_volume, env = self.discover_worker_params(workers)
             worker_cmd = ["celery", "-A", "worker.app", "worker", "--concurrency=1", "--loglevel=info"]
@@ -287,7 +281,6 @@ class Autoscaler:
                 logger.error("Failed to run autoscaled worker container: %s", exc)
                 action_taken = f"scale_up_failed: {exc}"
 
-        # Scale down check when queue is empty
         elif queued == 0:
             stopped = self.stop_idle_autoscaled(workers, idle_for=self.idle_for)
             if stopped > 0:

@@ -5,19 +5,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     server_id: str = "api_default"
 
-    # Database
     db_user: str = "cvp"
     db_password: str = "my_secret_password"
     db_name: str = "cvp"
     db_host: str = "postgres"
     db_port: int = 5432
 
-    # Redis
     redis_host: str = "redis"
     redis_port: int = 6379
     redis_db: int = 0
 
-    # Security & Admin
     jwt_secret: str = "super_secure_jwt_secret_key_12345"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
@@ -27,7 +24,6 @@ class Settings(BaseSettings):
     admin_email: str = "admin@example.com"
     admin_password: str = "admin_password_123"
 
-    # System Limits
     max_file_mb: int = 100
     max_duration_sec: int = 120
     max_active_tasks: int = 5
@@ -35,7 +31,6 @@ class Settings(BaseSettings):
     max_queue: int = 100
     result_lifetime_hours: int = 24
 
-    # Storage paths
     upload_dir: str = "/data/uploads" if os.name != "nt" else os.path.abspath("data/uploads")
     output_dir: str = "/data/outputs" if os.name != "nt" else os.path.abspath("data/outputs")
     log_dir: str = "/data/logs" if os.name != "nt" else os.path.abspath("data/logs")

@@ -9,7 +9,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class VideoProcessingUser(HttpUser):
-    # Wait between 1 and 2 seconds between tasks
     wait_time = between(1, 2)
 
     def on_start(self):
@@ -18,14 +17,12 @@ class VideoProcessingUser(HttpUser):
         self.email = f"load_{uuid.uuid4().hex[:8]}@example.com"
         self.password = "LoadPass123!"
 
-        # Register
         self.client.post(
             "/api/auth/register",
             json={"email": self.email, "password": self.password},
             name="/api/auth/register",
         )
 
-        # Login to receive HttpOnly JWT cookie
         self.client.post(
             "/api/auth/login",
             json={"email": self.email, "password": self.password},
@@ -37,7 +34,6 @@ class VideoProcessingUser(HttpUser):
         """Upload video and poll until processing is completed."""
         video_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "test_short.mp4"))
         if not os.path.exists(video_path):
-            # Fallback
             video_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "uploads", "short.mp4"))
 
         if not os.path.exists(video_path):
@@ -65,7 +61,6 @@ class VideoProcessingUser(HttpUser):
                     response.failure(f"Invalid JSON response: {e}")
                     return
 
-        # Poll task until done or timeout (max 60 seconds)
         start_poll = time.time()
         timeout_sec = 60
         while time.time() - start_poll < timeout_sec:

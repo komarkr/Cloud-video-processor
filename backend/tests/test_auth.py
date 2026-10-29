@@ -19,11 +19,9 @@ def test_register_success(client):
 def test_register_duplicate_email(client):
     """Test that registering an already existing email returns 400."""
     user_payload = {"email": "duplicate@example.com", "password": "password123"}
-    # First registration
     res1 = client.post("/api/register", json=user_payload)
     assert res1.status_code == 201
 
-    # Second registration with same email
     res2 = client.post("/api/register", json=user_payload)
     assert res2.status_code == 400
     assert "already registered" in res2.json()["detail"].lower()
@@ -31,13 +29,11 @@ def test_register_duplicate_email(client):
 
 def test_login_success(client):
     """Test login sets HttpOnly, Secure, SameSite=Lax cookie."""
-    # Register user first
     client.post(
         "/api/register",
         json={"email": "loginuser@example.com", "password": "password123"},
     )
 
-    # Login
     response = client.post(
         "/api/login",
         json={"email": "loginuser@example.com", "password": "password123"},
@@ -47,7 +43,6 @@ def test_login_success(client):
     assert data["status"] == "ok"
     assert "user" in data
 
-    # Verify cookie attributes
     set_cookie = response.headers.get("set-cookie")
     assert set_cookie is not None
     assert "access_token=" in set_cookie
@@ -80,14 +75,12 @@ def test_protected_me_without_cookie_returns_401(client):
 
 def test_protected_me_accessible_after_login(client):
     """Test protected endpoint /api/me works only after login with valid cookie."""
-    # Register and login
     email = "authenticated@example.com"
     pwd = "password123"
     client.post("/api/register", json={"email": email, "password": pwd})
     login_res = client.post("/api/login", json={"email": email, "password": pwd})
     assert login_res.status_code == 200
 
-    # Test /api/me works automatically using the stored cookie in client
     me_response = client.get("/api/me")
     assert me_response.status_code == 200
     data = me_response.json()
@@ -102,7 +95,6 @@ def test_require_admin_forbidden_for_regular_user(client):
     client.post("/api/register", json={"email": email, "password": pwd})
     client.post("/api/login", json={"email": email, "password": pwd})
 
-    # Access admin endpoint
     response = client.get("/api/admin/check")
     assert response.status_code == 403
     assert "admin privileges required" in response.json()["detail"].lower()
@@ -119,7 +111,6 @@ def test_require_admin_allowed_for_admin_user(client):
     )
     assert login_res.status_code == 200
 
-    # Access admin endpoint
     response = client.get("/api/admin/check")
     assert response.status_code == 200
     data = response.json()
@@ -134,18 +125,14 @@ def test_logout_clears_cookie_and_revokes_access(client):
     client.post("/api/register", json={"email": email, "password": pwd})
     client.post("/api/login", json={"email": email, "password": pwd})
 
-    # Verify authenticated
     assert client.get("/api/me").status_code == 200
 
-    # Logout
     logout_res = client.post("/api/logout")
     assert logout_res.status_code == 200
 
-    # Verify cookie is cleared in response
     set_cookie = logout_res.headers.get("set-cookie")
     assert set_cookie is not None
 
-    # After logout, /api/me should return 401
     me_after_logout = client.get("/api/me")
     assert me_after_logout.status_code == 401
 

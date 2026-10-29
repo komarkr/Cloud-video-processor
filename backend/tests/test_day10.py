@@ -79,7 +79,6 @@ def test_worker_heartbeat_loop_and_signals():
     mock_r = FakeRedis()
     hostname = socket.gethostname()
 
-    # Test task signals
     task_id = "test-task-123"
     on_task_prerun(task_id=task_id, task=None)
     assert get_current_task() == task_id
@@ -87,7 +86,6 @@ def test_worker_heartbeat_loop_and_signals():
     on_task_postrun(task_id=task_id, task=None)
     assert get_current_task() is None
 
-    # Simulate heartbeat write manually with FakeRedis
     mock_r.hset(
         f"hb:{hostname}",
         mapping={
@@ -105,7 +103,6 @@ def test_worker_heartbeat_loop_and_signals():
     assert hb["ram"] == "42.0"
     assert hb["current_task"] == ""
 
-    # Check alive_workers detects hb:* key
     assert alive_workers(mock_r) >= 1
 
 
@@ -121,7 +118,6 @@ def test_autoscaler_scale_up_to_max(db_session):
     db_session.query(Task).delete()
     db_session.commit()
 
-    # Pre-seed 8 queued tasks
     user = User(email="autoscale_test@example.com", hashed_password="mock", is_admin=False)
     db_session.add(user)
     db_session.commit()
@@ -154,25 +150,21 @@ def test_autoscaler_scale_up_to_max(db_session):
         idle_for=60,
     )
 
-    # Step 1: should scale from 2 to 3
     res1 = scaler.step(db_session)
     assert res1["action"] == "scale_up"
     assert res1["workers"] == 3
     assert len(mock_docker.containers.run_calls) == 1
 
-    # Step 2: should scale from 3 to 4
     res2 = scaler.step(db_session)
     assert res2["action"] == "scale_up"
     assert res2["workers"] == 4
     assert len(mock_docker.containers.run_calls) == 2
 
-    # Step 3: should NOT scale past MAX_WORKERS (4)
     res3 = scaler.step(db_session)
     assert res3["action"] == "none"
     assert res3["workers"] == 4
     assert len(mock_docker.containers.run_calls) == 2
 
-    # Verify event logs in Redis
     events = scaler.get_events()
     assert len(events) == 2
     assert events[0]["action"] == "scale_up"
@@ -194,7 +186,6 @@ def test_autoscaler_scale_down_when_queue_empty(db_session):
 
     w1 = MockDockerContainer("c1", "worker-1", labels={"cvp.role": "worker"})
     w2 = MockDockerContainer("c2", "worker-2", labels={"cvp.role": "worker"})
-    # 2 autoscaled workers
     w3 = MockDockerContainer("c3", "worker-3", labels={"cvp.role": "worker", "cvp.autoscaled": "1"})
     w4 = MockDockerContainer("c4", "worker-4", labels={"cvp.role": "worker", "cvp.autoscaled": "1"})
 
@@ -210,43 +201,35 @@ def test_autoscaler_scale_down_when_queue_empty(db_session):
         idle_for=60,
     )
 
-    # Initial step with idle_for=60: registers idle time, should NOT kill yet
     res1 = scaler.step(db_session)
     assert res1["action"] == "none"
     assert res1["workers"] == 4
     assert not w3.stopped
     assert not w4.stopped
 
-    # Simulate 61 seconds elapsed for w3 and w4
     now = time.time()
     scaler.idle_since["c3"] = now - 65
     scaler.idle_since["c4"] = now - 65
 
-    # Mark w4 as BUSY with an active task in Redis heartbeat
     mock_r.hset("hb:worker-4", mapping={"current_task": "task-uuid-444"})
 
-    # Next step: w3 is idle >= 60s -> should be stopped; w4 is busy -> kept!
     scaler.step(db_session)
     assert w3.stopped is True
     assert w3.removed is True
     assert w4.stopped is False
 
-    # Now make w4 idle too, simulate 65s idle
     mock_r.hset("hb:worker-4", mapping={"current_task": ""})
     scaler.idle_since["c4"] = now - 65
 
-    # Next step: w4 is stopped, reaching MIN_WORKERS (2)
     scaler.step(db_session)
     assert w4.stopped is True
     assert w4.removed is True
 
-    # Remaining workers are w1 and w2 (base workers)
     active = mock_docker.containers.list()
     assert len(active) == 2
     assert active[0].id == "c1"
     assert active[1].id == "c2"
 
-    # Even with further steps, base workers are never stopped below MIN_WORKERS
     scaler.idle_since["c1"] = now - 100
     scaler.idle_since["c2"] = now - 100
     scaler.step(db_session)
@@ -256,7 +239,6 @@ def test_autoscaler_scale_down_when_queue_empty(db_session):
 
 def test_autoscaler_status_api(client, db_session):
     """Test GET /api/autoscaler/status endpoint returns heartbeats and metrics."""
-    # Login user
     client.post("/api/auth/register", json={"email": "scale_api@example.com", "password": "password123"})
     client.post("/api/auth/login", json={"email": "scale_api@example.com", "password": "password123"})
 

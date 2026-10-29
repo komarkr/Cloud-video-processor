@@ -85,7 +85,6 @@ async def create_task(
     """
     os.makedirs(settings.upload_dir, exist_ok=True)
 
-    # Check available storage space (minimum 50 MB required)
     disk_usage = shutil.disk_usage(settings.upload_dir)
     if disk_usage.free < 50 * 1024 * 1024:
         raise HTTPException(
@@ -104,7 +103,7 @@ async def create_task(
     logo_file_path: Optional[str] = None
     max_bytes = settings.max_file_mb * 1024 * 1024
     total_bytes = 0
-    chunk_size = 1024 * 1024  # 1 MB
+    chunk_size = 1024 * 1024
 
     try:
         with open(file_path, "wb") as out_file:
@@ -133,7 +132,6 @@ async def create_task(
             detail=f"Failed to save uploaded file: {str(e)}",
         )
 
-    # Validate file with ffprobe
     probe_res = None
     try:
         probe_res = probe_video(file_path)
@@ -153,7 +151,6 @@ async def create_task(
             detail=f"Video validation failed: {str(e)}",
         )
 
-    # Check active user tasks limit (active <= 5)
     active_count = (
         db.query(Task)
         .filter(
@@ -170,7 +167,6 @@ async def create_task(
             detail=f"Active tasks limit exceeded (maximum {settings.max_active_tasks} active tasks allowed).",
         )
 
-    # Check global queue capacity (queued <= MAX_QUEUE)
     global_queued_count = (
         db.query(Task)
         .filter(Task.status == TaskStatus.queued)
@@ -185,7 +181,6 @@ async def create_task(
             headers={"Retry-After": "30"},
         )
 
-    # Parse optional JSON parameters
     parsed_params = {}
     if params:
         try:
@@ -197,9 +192,8 @@ async def create_task(
         except json.JSONDecodeError:
             parsed_params = {"raw": params}
 
-    parsed_params.pop("logo_path", None)   # шлях до логотипа ставить лише сервер
+    parsed_params.pop("logo_path", None)
 
-    # Validate logo for watermark operation
     op = (operation_type or "convert").lower()
     if op == "watermark":
         if not logo or not logo.filename:
@@ -211,7 +205,7 @@ async def create_task(
             )
 
         logo_file_path = os.path.join(settings.upload_dir, f"{task_id}_logo.png")
-        max_logo_bytes = 2 * 1024 * 1024  # 2 MB limit
+        max_logo_bytes = 2 * 1024 * 1024
         logo_bytes = 0
 
         try:
@@ -244,7 +238,6 @@ async def create_task(
                 detail=f"Failed to save logo file: {str(e)}",
             )
 
-        # Validate with Pillow verify()
         try:
             with Image.open(logo_file_path) as img:
                 img.verify()
@@ -262,7 +255,6 @@ async def create_task(
 
         parsed_params["logo_path"] = logo_file_path
 
-    # History limit: if user has >= MAX_HISTORY (20), delete oldest completed tasks + files
     user_total_count = db.query(Task).filter(Task.user_id == current_user.id).count()
     if user_total_count >= settings.max_history:
         to_delete_count = (user_total_count - settings.max_history) + 1
@@ -303,7 +295,6 @@ async def create_task(
             db.delete(old)
         db.commit()
 
-    # Create task record in DB
     new_task = Task(
         id=task_id,
         user_id=current_user.id,
@@ -319,7 +310,6 @@ async def create_task(
     db.commit()
     db.refresh(new_task)
 
-    # Dispatch Celery worker task asynchronously
     try:
         from worker.tasks import process_task
         process_task.delay(str(new_task.id))
@@ -374,7 +364,6 @@ async def events(
                     h = {}
 
             if not h:
-                # Fallback to database check
                 t = db.query(Task).filter(Task.id == task_id).first()
                 if t:
                     status_val = t.status.value
@@ -506,7 +495,6 @@ def delete_task(
         task.finished_at = datetime.now(timezone.utc)
         db.commit()
 
-    # Clean up files from disk
     if task.input_file and _is_safe_data_path(task.input_file) and os.path.exists(task.input_file):
         try:
             os.remove(task.input_file)
@@ -534,7 +522,6 @@ def delete_task(
         except OSError:
             pass
 
-    # Clean up Redis keys
     if r:
         try:
             r.delete(f"task:{task_id}", f"cancel:{task_id}")
@@ -581,7 +568,6 @@ def cancel_task(
             detail=f"Cannot cancel task with status '{task.status.value}'",
         )
 
-    # Redis cancellation flag
     try:
         r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     except Exception:

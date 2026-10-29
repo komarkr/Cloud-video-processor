@@ -33,7 +33,6 @@ def run_locust_benchmark(workers: int, run_time_sec: int = 40):
     """Scale Docker cluster to N workers and run headless Locust benchmark."""
     print(f"\n{'='*70}\n[BENCHMARK] Scaling cluster to {workers} workers...\n{'='*70}")
     subprocess.run(["docker", "compose", "up", "-d", f"--scale", f"worker={workers}"], check=True)
-    # Stop autoscaler so it doesn't alter worker count during controlled benchmark
     subprocess.run(["docker", "compose", "stop", "autoscaler"], check=True)
     time.sleep(3)
 
@@ -57,16 +56,12 @@ def main():
     print("Starting automated real load testing for Cloud Video Processor...")
     ensure_test_video()
 
-    # 1. Benchmark on 2 workers
     run_locust_benchmark(workers=2, run_time_sec=40)
 
-    # 2. Benchmark on 4 workers
     run_locust_benchmark(workers=4, run_time_sec=40)
 
-    # 3. Restore autoscaler
     subprocess.run(["docker", "compose", "start", "autoscaler"], check=True)
 
-    # 4. Generate comparison plots
     plot_script = os.path.join(ROOT_DIR, "scripts", "plot_locust_results.py")
     if os.path.exists(plot_script):
         subprocess.run([sys.executable, plot_script], check=True)

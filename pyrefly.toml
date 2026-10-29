@@ -1,0 +1,8 @@
+preset = "basic"
+search-path = ["backend"]
+project-includes = [
+    "backend",
+    "scripts",
+    "locustfile.py",
+]
+

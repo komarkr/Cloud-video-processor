@@ -215,11 +215,11 @@ def build_ffmpeg_args(task: Task, output_path: str) -> list[str]:
             "-protocol_whitelist",
             "file",
             "-i",
-            task.input_file,
+            str(task.input_file or ""),
             "-protocol_whitelist",
             "file",
             "-i",
-            logo_path,
+            str(logo_path or ""),
             "-filter_complex",
             filter_complex,
             "-c:v",
@@ -296,6 +296,8 @@ def process_task(task_id: str):
     db = SessionLocal()
     worker_id = socket.gethostname()
     os.makedirs(settings.output_dir, exist_ok=True)
+    task: Optional[Task] = None
+    output_path: Optional[str] = None
 
     try:
         task = db.query(Task).filter(Task.id == task_uuid).first()
@@ -398,15 +400,16 @@ def process_task(task_id: str):
 
     except Cancelled:
         logger.info("[worker_id=%s task_id=%s] Task was cancelled by user.", worker_id, task_id)
-        if os.path.exists(output_path):
+        if output_path and os.path.exists(output_path):
             try:
                 os.remove(output_path)
             except OSError:
                 pass
-        task.status = TaskStatus.cancelled
-        task.finished_at = datetime.now(timezone.utc)
-        task.error_message = "Task cancelled by user"
-        db.commit()
+        if task is not None:
+            task.status = TaskStatus.cancelled
+            task.finished_at = datetime.now(timezone.utc)
+            task.error_message = "Task cancelled by user"
+            db.commit()
         r.hset(
             f"task:{task_id}",
             mapping={
@@ -417,10 +420,11 @@ def process_task(task_id: str):
 
     except Exception as e:
         logger.error("[worker_id=%s task_id=%s] Task failed: %s", worker_id, task_id, e)
-        task.status = TaskStatus.failed
-        task.error_message = str(e)
-        task.finished_at = datetime.now(timezone.utc)
-        db.commit()
+        if task is not None:
+            task.status = TaskStatus.failed
+            task.error_message = str(e)
+            task.finished_at = datetime.now(timezone.utc)
+            db.commit()
         r.hset(
             f"task:{task_id}",
             mapping={

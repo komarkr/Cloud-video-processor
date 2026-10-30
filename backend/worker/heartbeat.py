@@ -25,7 +25,7 @@ def set_current_task(task_id: Optional[str]) -> None:
     global _current_task_id
     with _task_lock:
         _current_task_id = str(task_id) if task_id else None
-
+    
 
 def get_current_task() -> Optional[str]:
     """Retrieve current task id executing on this worker."""

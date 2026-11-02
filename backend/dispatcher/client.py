@@ -175,3 +175,4 @@ class WorkerClient:
         finally:
             if should_close:
                 await client.aclose()
+

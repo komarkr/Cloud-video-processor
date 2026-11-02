@@ -121,3 +121,4 @@ class WorkerRegistry:
                 w.state = "dead"
                 return True
             return False
+

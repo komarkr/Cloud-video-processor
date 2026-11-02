@@ -59,3 +59,4 @@ def get_balancing_strategy(name: str) -> BalancingStrategy:
     if key in ["round_robin", "rr"]:
         return RoundRobinStrategy()
     return LeastLoadedStrategy()
+

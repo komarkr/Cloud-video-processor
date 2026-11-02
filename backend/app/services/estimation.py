@@ -10,27 +10,22 @@ logger = logging.getLogger(__name__)
 
 
 def alive_workers(r: Optional[redis.Redis] = None) -> int:
-    """Determine the number of currently active/healthy workers."""
+    """Determine the total processing capacity of currently active/healthy workers."""
     if r:
         try:
             hb_keys = r.keys("hb:*")
             if hb_keys:
-                return len(hb_keys)
+                total_cap = 0
+                for k in hb_keys:
+                    h = r.hgetall(k)
+                    total_cap += int(h.get("capacity", 1))
+                return max(total_cap, 1)
 
             heartbeats = r.keys("worker:heartbeat:*")
             if heartbeats:
                 return len(heartbeats)
         except Exception:
             pass
-
-    try:
-        from worker.app import celery_app
-        insp = celery_app.control.inspect(timeout=0.2)
-        ping_res = insp.ping()
-        if ping_res:
-            return len(ping_res)
-    except Exception:
-        pass
 
     return 1
 

@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     output_dir: str = "/data/outputs" if os.name != "nt" else os.path.abspath("data/outputs")
     log_dir: str = "/data/logs" if os.name != "nt" else os.path.abspath("data/logs")
 
+    worker_token: str = "super_secret_worker_token"
+    dispatcher_url: str = "http://dispatcher:8100"
+    balancing_strategy: str = "least_loaded"
+    worker_capacity: int = 1
+    dispatch_interval: float = 1.0
+    worker_poll_interval: float = 3.0
+    worker_fail_threshold: int = 3
+    max_task_attempts: int = 3
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

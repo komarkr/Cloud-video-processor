@@ -10,7 +10,7 @@ pyjwt
 pytest
 pydantic-settings
 email-validator
-celery
+httpx
 pillow
 psutil
 docker

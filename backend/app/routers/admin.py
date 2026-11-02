@@ -164,6 +164,18 @@ def get_admin_overview(
         except Exception as exc:
             logger.warning("Error fetching autoscaler logs: %s", exc)
 
+    dispatch_events: List[Dict[str, Any]] = []
+    if r:
+        try:
+            raw_dispatch = r.lrange("dispatcher:log", 0, 49) or []
+            for item in raw_dispatch:
+                try:
+                    dispatch_events.append(json.loads(item))
+                except Exception:
+                    pass
+        except Exception as exc:
+            logger.warning("Error fetching dispatcher logs: %s", exc)
+
     return {
         "status": "ok",
         "status_counts": counts,
@@ -172,6 +184,7 @@ def get_admin_overview(
         "workers": workers,
         "recent_tasks": recent_tasks,
         "autoscaler_events": autoscaler_events,
+        "dispatch_events": dispatch_events,
     }
 
 

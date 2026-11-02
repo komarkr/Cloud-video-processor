@@ -74,18 +74,17 @@ def cleanup_expired_tasks(db: Session, r: Optional[redis.Redis] = None) -> int:
                     e,
                 )
 
-        if task.params and isinstance(task.params, dict):
-            logo_path = task.params.get("logo_path")
-            if logo_path and _is_safe_data_path(logo_path) and os.path.exists(logo_path):
-                try:
-                    os.remove(logo_path)
-                except OSError as e:
-                    logger.warning(
-                        "[cleanup] [task_id=%s] Could not remove logo file %s: %s",
-                        task_id,
-                        logo_path,
-                        e,
-                    )
+        logo_file = os.path.join(settings.upload_dir, f"{task_id}_logo.png")
+        if os.path.exists(logo_file):
+            try:
+                os.remove(logo_file)
+            except OSError as e:
+                logger.warning(
+                    "[cleanup] [task_id=%s] Could not remove logo file %s: %s",
+                    task_id,
+                    logo_file,
+                    e,
+                )
 
         log_file = os.path.join(settings.log_dir, f"{task_id}.log")
         if os.path.exists(log_file):

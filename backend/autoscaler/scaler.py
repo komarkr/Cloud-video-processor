@@ -19,7 +19,7 @@ logger = logging.getLogger("autoscaler")
 
 class Autoscaler:
     """
-    Autoscaling controller for Celery workers:
+    Autoscaling controller for HTTP worker servers:
     - Monitors database queued tasks count
     - Scales up when queued > workers * PER_WORKER (up to MAX_WORKERS)
     - Scales down idle autoscaled workers when queued == 0 after idle_for seconds (down to MIN_WORKERS)
@@ -142,11 +142,11 @@ class Autoscaler:
             media_volume = "cloud-video-processor_media"
 
         worker_env = {
-            "DATABASE_URL": os.getenv("DATABASE_URL", ""),
-            "REDIS_URL": os.getenv("REDIS_URL", "redis://redis:6379/0"),
-            "UPLOAD_DIR": os.getenv("UPLOAD_DIR", "/data/uploads"),
-            "OUTPUT_DIR": os.getenv("OUTPUT_DIR", "/data/outputs"),
-            "LOG_DIR": os.getenv("LOG_DIR", "/data/logs"),
+            "DISPATCHER_URL": os.getenv("DISPATCHER_URL", "http://dispatcher:8100"),
+            "WORKER_TOKEN": os.getenv("WORKER_TOKEN", "super_secret_worker_token"),
+            "WORKER_PORT": "9000",
+            "WORKER_CAPACITY": os.getenv("WORKER_CAPACITY", "1"),
+            "MAX_FILE_MB": os.getenv("MAX_FILE_MB", "100"),
             "CVP_ROLE": "worker",
         }
         if workers:
@@ -260,8 +260,8 @@ class Autoscaler:
         action_taken = "none"
 
         if queued > n * self.per_worker and n < self.max_workers:
-            image, network, media_volume, env = self.discover_worker_params(workers)
-            worker_cmd = ["celery", "-A", "worker.app", "worker", "--concurrency=1", "--loglevel=info"]
+            image, network, _, env = self.discover_worker_params(workers)
+            worker_cmd = ["uvicorn", "worker_server.main:app", "--host", "0.0.0.0", "--port", "9000"]
 
             try:
                 self.client.containers.run(
@@ -271,7 +271,6 @@ class Autoscaler:
                     network=network,
                     labels={"cvp.role": "worker", "cvp.autoscaled": "1"},
                     environment=env,
-                    volumes={media_volume: {"bind": "/data", "mode": "rw"}},
                     nano_cpus=2_000_000_000,
                 )
                 action_taken = "scale_up"

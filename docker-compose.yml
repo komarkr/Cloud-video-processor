@@ -1,3 +1,5 @@
+name: cloud-video-processor
+
 services:
   postgres:
     image: postgres:16
@@ -29,6 +31,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  dispatcher:
+    build: ./backend
+    command: uvicorn dispatcher.main:app --host 0.0.0.0 --port 8100
+    ports:
+      - "8100:8100"
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - media:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
   api1:
     build: ./backend
@@ -68,19 +88,16 @@ services:
 
   worker:
     build: ./backend
-    command: celery -A worker.app worker --concurrency=1 --loglevel=info
+    command: uvicorn worker_server.main:app --host 0.0.0.0 --port 9000
     env_file:
       - .env
     volumes:
       - ./backend:/app
-      - media:/data
     cpus: "2"
     labels:
       - "cvp.role=worker"
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
+      dispatcher:
         condition: service_started
 
   autoscaler:
@@ -94,7 +111,6 @@ services:
       - PER_WORKER=1
       - IDLE_FOR=30
       - DOCKER_NETWORK=cloud-video-processor_default
-      - MEDIA_VOLUME=cloud-video-processor_media
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -102,6 +118,8 @@ services:
       migrate:
         condition: service_completed_successfully
       redis:
+        condition: service_started
+      dispatcher:
         condition: service_started
 
   nginx:

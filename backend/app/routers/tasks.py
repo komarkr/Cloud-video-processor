@@ -81,7 +81,6 @@ async def create_task(
     6. Prune user history if >= MAX_HISTORY (delete oldest completed tasks along with files).
     7. Validate logo for watermark (PNG <= 2 MB via Pillow).
     8. Save task record with status 'queued'.
-    9. Dispatch Celery task: process_task.delay(task_id).
     """
     os.makedirs(settings.upload_dir, exist_ok=True)
 
@@ -253,7 +252,7 @@ async def create_task(
                 detail="Watermark logo must be a valid PNG image.",
             )
 
-        parsed_params["logo_path"] = logo_file_path
+        # Note: logo_path is NOT stored in parsed_params; logo resides at {upload_dir}/{task_id}_logo.png
 
     user_total_count = db.query(Task).filter(Task.user_id == current_user.id).count()
     if user_total_count >= settings.max_history:
@@ -279,13 +278,12 @@ async def create_task(
                     os.remove(old.output_file)
                 except OSError:
                     pass
-            if old.params and isinstance(old.params, dict):
-                old_logo = old.params.get("logo_path")
-                if old_logo and _is_safe_data_path(old_logo) and os.path.exists(old_logo):
-                    try:
-                        os.remove(old_logo)
-                    except OSError:
-                        pass
+            old_logo = os.path.join(settings.upload_dir, f"{old.id}_logo.png")
+            if os.path.exists(old_logo):
+                try:
+                    os.remove(old_logo)
+                except OSError:
+                    pass
             old_log = os.path.join(settings.log_dir, f"{old.id}.log")
             if os.path.exists(old_log):
                 try:
@@ -309,12 +307,6 @@ async def create_task(
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
-
-    try:
-        from worker.tasks import process_task
-        process_task.delay(str(new_task.id))
-    except Exception as e:
-        logger.warning("Could not dispatch Celery task %s to queue: %s", new_task.id, e)
 
     try:
         r = redis.Redis.from_url(settings.redis_url, decode_responses=True)
@@ -507,13 +499,12 @@ def delete_task(
         except OSError:
             pass
 
-    if task.params and isinstance(task.params, dict):
-        logo_path = task.params.get("logo_path")
-        if logo_path and _is_safe_data_path(logo_path) and os.path.exists(logo_path):
-            try:
-                os.remove(logo_path)
-            except OSError:
-                pass
+    logo_file = os.path.join(settings.upload_dir, f"{task_id}_logo.png")
+    if os.path.exists(logo_file):
+        try:
+            os.remove(logo_file)
+        except OSError:
+            pass
 
     log_path = os.path.join(settings.log_dir, f"{task_id}.log")
     if os.path.exists(log_path):

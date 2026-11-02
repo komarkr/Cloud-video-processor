@@ -286,3 +286,4 @@ def test_build_ffmpeg_args_all_operations():
     args_extract = build_ffmpeg_args(t_extract, "/tmp/out.mp3")
     assert "-vn" in args_extract
     assert "-c:a" in args_extract and "libmp3lame" in args_extract
+

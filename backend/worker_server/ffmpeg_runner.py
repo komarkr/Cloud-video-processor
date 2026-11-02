@@ -315,3 +315,4 @@ def run_ffmpeg(
                 with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
                     error_content = f.read()[-500:]
             raise RuntimeError(error_content or f"FFmpeg process failed with exit code {ret}.")
+

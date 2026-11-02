@@ -96,6 +96,22 @@ class FakeRedis:
     def expire(self, key, seconds):
         return True
 
+    def lpush(self, name, *values):
+        name_str = str(name)
+        if name_str not in self._data or not isinstance(self._data[name_str], list):
+            self._data[name_str] = []
+        for v in values:
+            self._data[name_str].insert(0, str(v))
+        return len(self._data[name_str])
+
+    def hincrby(self, name, key, amount=1):
+        name_str = str(name)
+        if name_str not in self._data or not isinstance(self._data[name_str], dict):
+            self._data[name_str] = {}
+        val = int(self._data[name_str].get(str(key), 0)) + int(amount)
+        self._data[name_str][str(key)] = str(val)
+        return val
+
     def rpush(self, name, *values):
         name_str = str(name)
         if name_str not in self._data or not isinstance(self._data[name_str], list):
@@ -170,9 +186,19 @@ def setup_mock_redis(monkeypatch):
         monkeypatch.setattr(redis.Redis, "from_url", lambda *args, **kwargs: _global_fake_redis)
         monkeypatch.setattr(aioredis, "from_url", lambda *args, **kwargs: FakeAsyncRedis(_global_fake_redis))
 
-    import worker.tasks
-    monkeypatch.setattr(worker.tasks, "SessionLocal", TestingSessionLocal)
-    monkeypatch.setattr(worker.tasks.process_task, "delay", lambda *args, **kwargs: None)
+    try:
+        import worker.tasks
+        monkeypatch.setattr(worker.tasks, "SessionLocal", TestingSessionLocal)
+        monkeypatch.setattr(worker.tasks.process_task, "delay", lambda *args, **kwargs: None)
+    except ImportError:
+        pass
+
+    try:
+        import dispatcher.main
+        monkeypatch.setattr(dispatcher.main, "session_factory", TestingSessionLocal)
+        monkeypatch.setattr(dispatcher.main, "redis_getter", lambda: _global_fake_redis)
+    except ImportError:
+        pass
 
 
 @pytest.fixture(scope="session", autouse=True)

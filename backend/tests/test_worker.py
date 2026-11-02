@@ -6,25 +6,15 @@ import redis
 from app.config import settings
 from app.models import Task, TaskStatus, User
 from app.services.probe import probe_video
-from worker.tasks import process_task
+from tests.conftest import NoCloseSession, process_task, set_process_task_session_factory
 
 FIXTURES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "fixtures", "videos"))
 
 
 @pytest.fixture(autouse=True)
 def bind_worker_session(monkeypatch, db_session):
-    """Ensure worker.tasks uses the active test database session."""
-    class NoCloseSession:
-        def __init__(self, s):
-            self._s = s
-
-        def __getattr__(self, item):
-            if item == "close":
-                return lambda: None
-            return getattr(self._s, item)
-
-    import worker.tasks
-    monkeypatch.setattr(worker.tasks, "SessionLocal", lambda: NoCloseSession(db_session))
+    """Ensure process_task uses the active test database session."""
+    set_process_task_session_factory(lambda: NoCloseSession(db_session))
 
 
 @pytest.fixture

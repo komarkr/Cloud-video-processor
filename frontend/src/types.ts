@@ -83,6 +83,14 @@ export interface AutoscalerEvent {
   timestamp: string;
 }
 
+export interface DispatchEvent {
+  ts: string;
+  event: string;
+  task_id?: string | null;
+  worker_id?: string | null;
+  detail?: string;
+}
+
 export interface AdminOverview {
   status: string;
   status_counts: StatusCounts;
@@ -91,6 +99,7 @@ export interface AdminOverview {
   workers: AdminWorker[];
   recent_tasks: AdminTask[];
   autoscaler_events: AutoscalerEvent[];
+  dispatch_events?: DispatchEvent[];
 }
 
 

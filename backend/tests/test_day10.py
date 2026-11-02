@@ -9,14 +9,6 @@ from app.models import Task, TaskStatus, User
 from app.services.estimation import alive_workers
 from autoscaler.scaler import Autoscaler
 from tests.conftest import FakeRedis
-from worker.heartbeat import (
-    get_current_task,
-    on_task_postrun,
-    on_task_prerun,
-    set_current_task,
-    start_heartbeat,
-    stop_heartbeat,
-)
 
 
 class MockDockerContainer:
@@ -75,16 +67,9 @@ class MockDockerClient:
 
 
 def test_worker_heartbeat_loop_and_signals():
-    """Verify heartbeat writes to Redis and task signals update current_task."""
+    """Verify heartbeat format in Redis."""
     mock_r = FakeRedis()
     hostname = socket.gethostname()
-
-    task_id = "test-task-123"
-    on_task_prerun(task_id=task_id, task=None)
-    assert get_current_task() == task_id
-
-    on_task_postrun(task_id=task_id, task=None)
-    assert get_current_task() is None
 
     mock_r.hset(
         f"hb:{hostname}",

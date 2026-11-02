@@ -2,7 +2,7 @@
 
 Розподілений хмарний сервіс пакетної обробки відео із високою доступністю, динамічним автомасштабуванням та моніторингом у реальному часі.
 
-Побудовано на базі **FastAPI**, **Nginx** (балансувальник `least_conn` + HTTPS), **Celery**, **Redis** та **PostgreSQL**. Обробка мультимедіа здійснюється асинхронно через **FFmpeg** із трансляцією живого прогресу в браузер за допомогою **Server-Sent Events (SSE)**.
+Побудовано на базі **FastAPI**, **Nginx** (балансувальник `least_conn` + HTTPS), **Dispatcher** (push-балансувальник задач), **Worker Server** (автономні HTTP-сервери обробки), **Redis** та **PostgreSQL**. Обробка мультимедіа здійснюється асинхронно через **FFmpeg** із трансляцією живого прогресу в браузер за допомогою **Server-Sent Events (SSE)**.
 
 ---
 
@@ -20,31 +20,36 @@ flowchart TB
         API2["api2 (FastAPI, Uvicorn)<br/>X-Served-By: api2"]
     end
 
-    subgraph STATE["Спільний стан (State & Storage)"]
-        Redis[("Redis 7<br/>Черга задач, Heartbeat, SSE, Кеш")]
-        PG[("PostgreSQL 16<br/>Користувачі, Задачі, Історія")]
+    subgraph CORE_STATE["Спільний стан (Лише API та Dispatcher)"]
+        Redis[("Redis 7<br/>Прогрес, Heartbeat, SSE, Скасування, Логи")]
+        PG[("PostgreSQL 16<br/>Користувачі, Задачі, Журнал")]
         Storage["Спільний том /data<br/>uploads, outputs, logs"]
     end
 
-    subgraph WORKER_POOL["Пул воркерів (Celery + FFmpeg)"]
-        W1["worker-1<br/>prefetch=1, ack_late=True"]
-        W2["worker-2<br/>prefetch=1, ack_late=True"]
-        WN["worker-N (Autoscaled)<br/>динамічні воркери"]
+    Dispatcher["Dispatcher Daemon (1 екземпляр)<br/>Вибірка queued, балансування (least_loaded/round_robin),<br/>HTTP-стрімінг файлів, моніторинг, перезапуск збоїв"]
+
+    subgraph WORKER_POOL["Ізольовані Worker-сервери (HTTP :9000)"]
+        W1["worker-1 (FastAPI + FFmpeg)<br/>локальний диск, без доступу до БД/Redis"]
+        W2["worker-2 (FastAPI + FFmpeg)<br/>локальний диск, без доступу до БД/Redis"]
+        WN["worker-remote (Віддалена машина / Autoscaled)<br/>HTTP push :9000"]
     end
 
-    Autoscaler["Autoscaler Daemon<br/>Моніторинг черги, Docker SDK"]
+    Autoscaler["Autoscaler Daemon<br/>Моніторинг queued задач, Docker SDK"]
 
     Browser -->|HTTPS :443| Nginx
     Nginx -->|Балансування| API1
     Nginx -->|Балансування| API2
-    API_CLUSTER -->|"БД, черга, спільні файли"| STATE
-    STATE <-->|"Вибірка задач, FFmpeg, прогрес"| WORKER_POOL
-    Autoscaler -->|"scale up / down"| WORKER_POOL
-    Autoscaler -.->|"опитування довжини черги"| Redis
+    API_CLUSTER -->|"Створення queued, читання SSE / результатів"| CORE_STATE
+    Dispatcher <-->|"Вибірка задач, збереження outputs"| CORE_STATE
+    Dispatcher -->|"HTTP POST /execute (стрімінг файлу)"| WORKER_POOL
+    WORKER_POOL -->|"HTTP GET progress / result"| Dispatcher
+    WORKER_POOL -.->|"Самореєстрація / Heartbeat"| Dispatcher
+    Autoscaler -->|"scale up / down контейнерів"| WORKER_POOL
+    Autoscaler -.->|"опитування queued задач"| CORE_STATE
 
     classDef app fill:#EEEDFE,stroke:#534AB7,color:#3C3489
     classDef state fill:#E1F5EE,stroke:#0F6E56,color:#085041
-    class Nginx,API1,API2,W1,W2,WN,Autoscaler app
+    class Nginx,API1,API2,Dispatcher,W1,W2,WN,Autoscaler app
     class Redis,PG,Storage state
 ```
 
@@ -64,12 +69,16 @@ docker compose up --build -d
 
 Команда автоматично ініціалізує:
 - **`postgres`** — база даних на порту `5432` з healthcheck;
-- **`redis`** — брокер черги та стан на порту `6379`;
+- **`redis`** — сховище швидкого стану (прогрес, прапорці скасування, heartbeat, логи) на порту `6379`;
 - **`migrate`** — автоматичне застосування міграцій бази даних через Alembic;
 - **`api1`** та **`api2`** — два незалежних бекенд-сервери на базі FastAPI;
-- **`worker`** — пул обробників Celery з прив'язкою до спільного тому `/data`;
-- **`autoscaler`** — служба автоматичного масштабування воркерів (2..4 контейнери);
+- **`dispatcher`** — єдиний екземпляр координатора задач (порт `8100`, вибірка `queued` задач, балансування, стрімінг файлів, моніторинг та перезапуск збоїв);
+- **`worker`** — мережевий воркер-сервер на базі FastAPI (порт `9000`, ізольований від БД/Redis/спільного тому `/data`, запуск FFmpeg);
+- **`autoscaler`** — служба автоматичного масштабування HTTP-воркерів (2..4 контейнери);
 - **`nginx`** — балансувальник навантаження, SSL-термінація та роздача React SPA на портах `80` (HTTP) та `443` (HTTPS).
+
+> [!IMPORTANT]
+> **Служба `dispatcher` повинна працювати виключно в одному екземплярі** (не масштабувати репліками через Docker Compose, щоб запобігти конфліктам розподілу задач). Горизонтально масштабуються виключно воркери (`worker`) та сервери API (`api1`, `api2`).
 
 ### 3. Доступ до системи
 - **Вебінтерфейс (SPA):** [https://localhost](https://localhost)
@@ -78,6 +87,31 @@ docker compose up --build -d
 - **Облікові дані адміністратора за замовчуванням:**
   - **Email:** `admin@example.com`
   - **Пароль:** `admin_password_123`
+
+---
+
+## 🌐 Запуск воркера на віддаленій машині (Remote Worker)
+
+Завдяки новій HTTP-архітектурі воркер є повністю автономним сервером: йому **не потрібні** спільний том `/data`, доступ до бази даних PostgreSQL чи брокера Redis. Воркер може виконуватися на будь-якому окремому комп'ютері або виділеному сервері:
+
+```bash
+# На віддаленому комп'ютері (де встановлено Python 3.10+ та FFmpeg)
+cd backend
+pip install -r requirements.txt
+
+# Налаштування змінних оточення та запуск HTTP-воркера
+export WORKER_ID=remote-worker-1
+export WORKER_PORT=9000
+export WORKER_CAPACITY=1
+export WORKER_PUBLIC_URL=http://<REMOTE_HOST_IP>:9000
+export DISPATCHER_URL=http://<DISPATCHER_HOST_IP>:8100
+export WORKER_TOKEN=secret_worker_token_change_in_production
+export WORKER_DATA_DIR=/tmp/cvp-worker
+
+uvicorn worker_server.main:app --host 0.0.0.0 --port 9000
+```
+
+Воркер у фоні автоматично зареєструється у Dispatcher (`POST /internal/workers/register`) і періодично надсилатиме heartbeat (кожні 10 с). Dispatcher автоматично передаватиме йому задачі через HTTP із потоковою передачею відеофайлів, опитуватиме прогрес та забиратиме результат.
 
 ---
 
@@ -98,6 +132,14 @@ docker compose up --build -d
 | **`JWT_EXPIRE_MINUTES`** | `int` | `60` | Термін дії сесійного токена у хвилинах |
 | **`COOKIE_SECURE`** | `bool` | `true` | Прапорець Secure для cookie токена |
 | **`COOKIE_SAMESITE`** | `str` | `lax` | Політика SameSite для сесійних cookie |
+| **`WORKER_TOKEN`** | `str` | `secret_worker_token_...` | Секретний токен автентифікації для взаємодії Dispatcher та Worker |
+| **`DISPATCHER_URL`** | `str` | `http://dispatcher:8100` | Внутрішня адреса Dispatcher для самореєстрації воркерів |
+| **`BALANCING_STRATEGY`** | `str` | `least_loaded` | Стратегія балансування задач між воркерами (`least_loaded` або `round_robin`) |
+| **`WORKER_CAPACITY`** | `int` | `1` | Кількість одночасних задач на одного воркера |
+| **`DISPATCH_INTERVAL`** | `float` | `1.0` | Інтервал вибірки та розподілу queued задач (секунди) |
+| **`WORKER_POLL_INTERVAL`** | `float` | `1.0` | Інтервал опитування прогресу активних задач воркерів (секунди) |
+| **`WORKER_FAIL_THRESHOLD`** | `int` | `3` | Кількість невдалих опитувань воркера до позначення як dead |
+| **`MAX_TASK_ATTEMPTS`** | `int` | `3` | Максимальна кількість спроб виконання задачі при аварії воркера |
 | **`ADMIN_EMAIL`** | `str` | `admin@example.com` | Email системного адміністратора (створюється при старті) |
 | **`ADMIN_PASSWORD`** | `str` | `admin_password_123` | Пароль облікового запису адміністратора |
 | **`MAX_FILE_MB`** | `int` | `100` | Максимальний розмір відеофайлу у МБ |
@@ -135,15 +177,15 @@ docker compose up --build -d
 | :-: | :--- | :--- | :--- |
 | **КТ1** | Балансувальник навантаження, HTTPS, `least_conn`, `X-Served-By` | Nginx зворотний проксі, mkcert TLS сертифікати, заголовок `X-Served-By` у middleware FastAPI, 2 сервери `api1` та `api2` | [`nginx/nginx.conf`](nginx/nginx.conf), [`backend/app/main.py`](backend/app/main.py) |
 | **п. 1** | Завантаження та валідація відео | Стрімінгове збереження шматками, `probe_video` через ffprobe, валідація тривалості, розміру, потоків, лімітів | [`backend/app/routers/tasks.py`](backend/app/routers/tasks.py), [`backend/app/services/probe.py`](backend/app/services/probe.py) |
-| **КТ2** | Черга та асинхронні воркери, FFmpeg | Celery worker (`--concurrency=1`, `worker_prefetch_multiplier=1`, `task_acks_late=True`), спільний том `/data`, запуск FFmpeg із перехопленням прогресу | [`backend/worker/tasks.py`](backend/worker/tasks.py), [`backend/worker/app.py`](backend/worker/app.py) |
-| **п. 2** | Операції обробки відео | Конвертація у MP4 (H.264+AAC), масштабування (1080p..360p з CRF), водяний знак PNG з прозорістю, вилучення аудіо у MP3 / mute | [`backend/worker/tasks.py`](backend/worker/tasks.py) |
-| **п. 3** | Скасування задачі | Прапорець `cancel:{task_id}` у Redis, кооперативне скасування у воркері через `proc.terminate()`, очищення незавершеного файлу | [`backend/app/routers/tasks.py`](backend/app/routers/tasks.py), [`backend/worker/tasks.py`](backend/worker/tasks.py) |
+| **КТ2** | Координатор Dispatcher та HTTP воркери, FFmpeg | Dispatcher (`least_loaded` / `round_robin`), автономні HTTP воркер-сервери (`/execute`, `/progress`, `/cancel`, `/result`), стрімінг файлів, ізольований диск без БД/Redis, запуск FFmpeg із перехопленням прогресу | [`backend/dispatcher/main.py`](backend/dispatcher/main.py), [`backend/worker_server/main.py`](backend/worker_server/main.py) |
+| **п. 2** | Операції обробки відео | Конвертація у MP4 (H.264+AAC), масштабування (1080p..360p з CRF), водяний знак PNG з прозорістю, вилучення аудіо у MP3 / mute | [`backend/worker_server/ffmpeg_runner.py`](backend/worker_server/ffmpeg_runner.py) |
+| **п. 3** | Скасування задачі | Прапорець `cancel:{task_id}` у Redis, виклик `/tasks/{id}/cancel` на воркері, зупинка FFmpeg (`proc.terminate()`), очищення незавершеного файлу | [`backend/app/routers/tasks.py`](backend/app/routers/tasks.py), [`backend/worker_server/main.py`](backend/worker_server/main.py) |
 | **п. 4** | Відстеження прогресу (SSE) | Ендпоінт `GET /api/tasks/{id}/events` передає поточний статус і відсоток (0..100) з Redis раз на 1 секунду | [`backend/app/routers/tasks.py`](backend/app/routers/tasks.py) |
 | **КТ3** | Вебінтерфейс користувача | React 18, TypeScript, адаптивний темний UI, EventSource слухач, перегляд результату через `<video controls>`, керування задачами | [`frontend/src/App.tsx`](frontend/src/App.tsx), [`frontend/src/pages/TasksPage.tsx`](frontend/src/pages/TasksPage.tsx) |
-| **п. 6** | Черга та оцінка часу (ETA) | Розрахунок `queue_position` та `estimate_wait_sec` за тривалістю попередніх задач, залишковим прогресом та активними воркерами | [`backend/app/services/estimation.py`](backend/app/services/estimation.py) |
-| **п. 7** | Heartbeat воркерів та Autoscaler | Фоновий потік у воркері пише `hb:{hostname}` у Redis (CPU, RAM, timestamp, TTL 10с); служба `autoscaler` масштабує контейнери за довжиною черги | [`backend/worker/heartbeat.py`](backend/worker/heartbeat.py), [`backend/autoscaler/scaler.py`](backend/autoscaler/scaler.py) |
-| **КТ4** | Адмін-панель (`/admin`) | `GET /api/admin/overview`, сторінка моніторингу з опитуванням раз на 3 с, картки статусів, таблиця воркерів з CPU/RAM, останні 50 задач, журнал масштабування, скасування будь-якої задачі | [`backend/app/routers/admin.py`](backend/app/routers/admin.py), [`frontend/src/pages/AdminPage.tsx`](frontend/src/pages/AdminPage.tsx) |
-| **п. 8** | Аудит безпеки та стабілізація | Без `shell=True`, `-protocol_whitelist file`, файли виключно як UUID, перевірка власника в усіх ендпоінтах, `limit_req`, HttpOnly Secure cookies | [`backend/worker/tasks.py`](backend/worker/tasks.py), [`backend/app/routers/auth.py`](backend/app/routers/auth.py) |
+| **п. 6** | Черга та оцінка часу (ETA) | Розрахунок `queue_position` та `estimate_wait_sec` за тривалістю попередніх задач, залишковим прогресом та сумарною місткістю воркерів | [`backend/app/services/estimation.py`](backend/app/services/estimation.py) |
+| **п. 7** | Реєстрація воркерів та Autoscaler | Самореєстрація воркерів у Dispatcher (`POST /internal/workers/register`), періодичний heartbeat; служба `autoscaler` масштабує HTTP-воркери за чергою | [`backend/worker_server/main.py`](backend/worker_server/main.py), [`backend/autoscaler/scaler.py`](backend/autoscaler/scaler.py) |
+| **КТ4** | Адмін-панель (`/admin`) | `GET /api/admin/overview`, сторінка моніторингу з опитуванням раз на 3 с, картки статусів, таблиця воркерів з CPU/RAM, журнал Dispatcher log, останні 50 задач, журнал масштабування, скасування будь-якої задачі | [`backend/app/routers/admin.py`](backend/app/routers/admin.py), [`frontend/src/pages/AdminPage.tsx`](frontend/src/pages/AdminPage.tsx) |
+| **п. 8** | Аудит безпеки та стабілізація | Без `shell=True`, `-protocol_whitelist file`, токен `X-Worker-Token`, файли виключно як UUID, перевірка власника в усіх ендпоінтах, `limit_req`, HttpOnly Secure cookies | [`backend/worker_server/ffmpeg_runner.py`](backend/worker_server/ffmpeg_runner.py), [`backend/app/routers/auth.py`](backend/app/routers/auth.py) |
 | **п. 9** | Фонове прибирання | Служба `cleanup_expired_tasks` видаляє застарілі файли та записи з бази раз на 10 хвилин за полем `expires_at` | [`backend/app/services/cleanup.py`](backend/app/services/cleanup.py), [`backend/app/main.py`](backend/app/main.py) |
 | **п. 10** | Навантажувальне тестування (Locust) | Сценарій навантаження (реєстрація → вхід → завантаження → опитування), порівняння 2 vs 4 воркери, збереження графіків та CSV | [`locustfile.py`](locustfile.py), [`scripts/benchmark_workers.py`](scripts/benchmark_workers.py), [`docs/evidence/`](docs/evidence/) |
 
@@ -185,7 +227,7 @@ docker compose up --build -d
 
 ## 🧪 Запуск тестів (Pytest)
 
-Проєкт містить вичерпний набір із 57 тестів, що покривають усі 13 днів розробки:
+Проєкт містить вичерпний набір із 86 тестів, що покривають повний життєвий цикл системи:
 ```bash
 # Запуск повного тестового набору
 pytest backend/tests
@@ -197,12 +239,15 @@ pytest backend/tests -v
 Покриття тестів включає:
 - `test_auth.py` — реєстрація, логін, захист сесій, валідація email та паролів;
 - `test_tasks.py` — завантаження файлів, валідація `ffprobe`, перевірка лімітів;
-- `test_worker.py` — асинхронні задачі Celery, генерація аргументів FFmpeg, скасування;
+- `test_worker.py` — обробка задач через `process_task`, аргументи FFmpeg, перевірка скасування;
+- `test_worker_server.py` — робота автономного HTTP воркер-сервера (`/execute`, `/progress`, `/cancel`, `/result`, перевірка токена, лімітів місткості та диску);
+- `test_dispatcher.py` — балансувальник задач, стратегії `least_loaded` / `round_robin`, реєстр воркерів, стрімінг задач, моніторинг, обробка аварій воркерів та перепризначення;
 - `test_day6.py` — Server-Sent Events (SSE), завантаження результатів, водяні знаки;
 - `test_day9.py` — черга, розрахунок позиції та ETA, Retry-After;
 - `test_day10.py` — heartbeat воркерів, autoscaler алгоритм, моніторинг ресурсів;
 - `test_day11.py` — адмін-ендпоінти, перевірка доступу 401/403, огляд кластера;
 - `test_day12.py` — аудит безпеки, protocol whitelist, санітизація UUID, очищення застарілих задач;
-- `test_day13.py` — ліміти активних задач та історії, парсинг виводу FFmpeg на тестових рядках, прапорець скасування.
+- `test_day13.py` — ліміти активних задач та історії, парсинг виводу FFmpeg на тестових рядках, прапорець скасування;
+- `test_e2e_flow.py` — повні наскрізні сценарії обробки чотирьох типів операцій, скасування та ізоляції.
 
 ---

@@ -70,13 +70,14 @@ def get_ffprobe_executable() -> str:
     return "ffprobe"
 
 
-def get_output_extension(task: Any) -> str:
+def get_output_extension(task: Any, params: Optional[dict] = None) -> str:
     if isinstance(task, dict):
         op = (task.get("operation_type") or "").lower()
         params = task.get("params") or {}
     elif isinstance(task, str):
         op = task.lower()
-        params = {}
+        if params is None:
+            params = {}
     else:
         op = (getattr(task, "operation_type", "") or "").lower()
         params = getattr(task, "params", {}) or {}

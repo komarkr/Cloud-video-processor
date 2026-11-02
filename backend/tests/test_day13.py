@@ -11,7 +11,7 @@ from app.models import Task, TaskStatus, User
 from app.services.estimation import estimate_wait_sec, get_queue_position
 from app.services.security import hash_password
 from tests.conftest import FakeRedis
-from worker.tasks import (
+from worker_server.ffmpeg_runner import (
     Cancelled,
     parse_ffmpeg_progress_line,
     run_ffmpeg,

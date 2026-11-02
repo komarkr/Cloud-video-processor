@@ -9,7 +9,8 @@ from app.config import settings
 from app.db import get_db
 from app.main import app
 from app.models import Task, TaskStatus, User
-from worker.tasks import build_ffmpeg_args, get_output_extension, process_task
+from worker_server.ffmpeg_runner import build_ffmpeg_args, get_output_extension
+from tests.conftest import NoCloseSession, process_task, set_process_task_session_factory
 
 FIXTURES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "fixtures", "videos"))
 IMAGES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "fixtures", "images"))
@@ -17,18 +18,8 @@ IMAGES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "fixtures",
 
 @pytest.fixture(autouse=True)
 def bind_worker_session(monkeypatch, db_session):
-    """Ensure worker.tasks uses the active test database session."""
-    class NoCloseSession:
-        def __init__(self, s):
-            self._s = s
-
-        def __getattr__(self, item):
-            if item == "close":
-                return lambda: None
-            return getattr(self._s, item)
-
-    import worker.tasks
-    monkeypatch.setattr(worker.tasks, "SessionLocal", lambda: NoCloseSession(db_session))
+    """Ensure process_task uses the active test database session."""
+    set_process_task_session_factory(lambda: NoCloseSession(db_session))
 
 
 @pytest.fixture

@@ -198,14 +198,18 @@ def test_cancel_task_endpoint(client, monkeypatch):
     )
     assert cancel_resp.status_code == 200
 
-    time.sleep(0.1)
+    cancelled = False
+    for _ in range(40):
+        prog_resp = client.get(
+            f"/tasks/{task_id}/progress",
+            headers={"X-Worker-Token": WORKER_TOKEN},
+        )
+        if prog_resp.status_code == 200 and prog_resp.json()["status"] == "cancelled":
+            cancelled = True
+            break
+        time.sleep(0.05)
 
-    prog_resp = client.get(
-        f"/tasks/{task_id}/progress",
-        headers={"X-Worker-Token": WORKER_TOKEN},
-    )
-    assert prog_resp.status_code == 200
-    assert prog_resp.json()["status"] == "cancelled"
+    assert cancelled
 
 
 def test_result_download_and_conflict_handling(client, monkeypatch):

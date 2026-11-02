@@ -307,6 +307,75 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onGoBack }) => {
             )}
           </article>
 
+          <article className="card-container" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
+            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>Журнал розподілу задач (Dispatcher Log)</span>
+            </h3>
+
+            {(!overview.dispatch_events || overview.dispatch_events.length === 0) ? (
+              <p style={{ color: '#94a3b8', margin: 0 }}>Подій розподілу ще немає.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table role="grid" style={{ marginBottom: 0 }}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Час</th>
+                      <th scope="col">Подія</th>
+                      <th scope="col">Task ID</th>
+                      <th scope="col">Worker ID</th>
+                      <th scope="col">Подробиці</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.dispatch_events.map((ev, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontSize: '0.85rem' }}>{formatDate(ev.ts)}</td>
+                        <td>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background:
+                                ev.event === 'dispatched'
+                                  ? 'rgba(56, 189, 248, 0.2)'
+                                  : ev.event === 'done'
+                                  ? 'rgba(16, 185, 129, 0.2)'
+                                  : ev.event === 'failed'
+                                  ? 'rgba(239, 68, 68, 0.2)'
+                                  : ev.event === 'requeued'
+                                  ? 'rgba(245, 158, 11, 0.2)'
+                                  : 'rgba(148, 163, 184, 0.2)',
+                              color:
+                                ev.event === 'dispatched'
+                                  ? '#38bdf8'
+                                  : ev.event === 'done'
+                                  ? '#10b981'
+                                  : ev.event === 'failed'
+                                  ? '#ef4444'
+                                  : ev.event === 'requeued'
+                                  ? '#f59e0b'
+                                  : '#94a3b8',
+                            }}
+                          >
+                            {ev.event}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                          {ev.task_id ? `${ev.task_id.slice(0, 8)}...` : '—'}
+                        </td>
+                        <td style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{ev.worker_id || '—'}</td>
+                        <td style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>{ev.detail || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+
           <article className="card-container" style={{ padding: '1.25rem' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>Останні 50 задач кластера</span>

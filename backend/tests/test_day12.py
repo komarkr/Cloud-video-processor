@@ -10,7 +10,7 @@ from app.models import Task, TaskStatus, User
 from app.services.cleanup import cleanup_expired_tasks
 from app.services.security import hash_password
 from tests.conftest import FakeRedis
-from worker.tasks import build_ffmpeg_args
+from worker_server.ffmpeg_runner import build_ffmpeg_args
 
 
 def test_ffmpeg_protocol_whitelist_in_arguments():

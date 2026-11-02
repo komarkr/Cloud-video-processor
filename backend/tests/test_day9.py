@@ -10,17 +10,12 @@ from app.services.estimation import (
     get_queue_position,
     recent_speed,
 )
-from worker.app import celery_app
-
-
-def test_celery_configuration_and_limits():
-    """Verify Celery app has prefetch 1, acks_late, reject_on_worker_lost, and soft_time_limit 600."""
-    conf = celery_app.conf
-    assert conf.worker_prefetch_multiplier == 1
-    assert conf.task_acks_late is True
-    assert conf.task_reject_on_worker_lost is True
-    assert conf.task_soft_time_limit == 600
-    assert conf.task_time_limit == 660
+def test_dispatcher_and_worker_limits():
+    """Verify Dispatcher and Worker configuration limits and timeouts."""
+    assert settings.worker_capacity >= 1
+    assert settings.dispatch_interval > 0
+    assert settings.worker_fail_threshold >= 1
+    assert settings.max_task_attempts >= 1
 
 
 def test_queue_position_calculation(db_session):

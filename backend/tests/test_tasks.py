@@ -207,6 +207,7 @@ def test_create_task_global_queue_full_returns_503(auth_client, db_session, monk
 
 def test_get_tasks_returns_only_own_tasks(client, db_session):
     """Test GET /api/tasks returns only tasks belonging to the authenticated user."""
+    client.cookies.clear()
     pwd = "password123"
     email_a = "user_a@example.com"
     client.post("/api/register", json={"email": email_a, "password": pwd})
@@ -223,8 +224,8 @@ def test_get_tasks_returns_only_own_tasks(client, db_session):
     db_session.add(task_a)
 
     email_b = "user_b@example.com"
-    client.post("/api/register", json={"email": email_b, "password": pwd})
-    user_b = db_session.query(User).filter(User.email == email_b).first()
+    user_b = User(id=uuid.uuid4(), email=email_b, hashed_password=hash_password(pwd), is_admin=False)
+    db_session.add(user_b)
 
     task_b = Task(
         id=uuid.uuid4(),

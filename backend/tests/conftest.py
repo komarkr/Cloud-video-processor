@@ -187,18 +187,88 @@ def setup_mock_redis(monkeypatch):
         monkeypatch.setattr(aioredis, "from_url", lambda *args, **kwargs: FakeAsyncRedis(_global_fake_redis))
 
     try:
-        import worker.tasks
-        monkeypatch.setattr(worker.tasks, "SessionLocal", TestingSessionLocal)
-        monkeypatch.setattr(worker.tasks.process_task, "delay", lambda *args, **kwargs: None)
-    except ImportError:
-        pass
-
-    try:
         import dispatcher.main
         monkeypatch.setattr(dispatcher.main, "session_factory", TestingSessionLocal)
         monkeypatch.setattr(dispatcher.main, "redis_getter", lambda: _global_fake_redis)
     except ImportError:
         pass
+
+
+class NoCloseSession:
+    def __init__(self, s):
+        self._s = s
+
+    def __getattr__(self, item):
+        if item == "close":
+            return lambda: None
+        return getattr(self._s, item)
+
+
+_task_session_factory = TestingSessionLocal
+
+
+def set_process_task_session_factory(factory):
+    global _task_session_factory
+    _task_session_factory = factory
+
+
+def process_task(task_id: str):
+    from datetime import datetime, timezone, timedelta
+    import uuid
+    from app.config import settings
+    from app.models import Task, TaskStatus
+    from worker_server.ffmpeg_runner import (
+        build_ffmpeg_args,
+        get_output_extension,
+        run_ffmpeg,
+    )
+
+    db = _task_session_factory()
+    try:
+        t = db.query(Task).filter(Task.id == uuid.UUID(task_id)).first()
+        if not t or t.status == TaskStatus.cancelled:
+            return
+
+        t.status = TaskStatus.running
+        t.started_at = datetime.now(timezone.utc)
+        t.worker_id = "test-worker"
+        db.commit()
+
+        out_ext = get_output_extension(t.operation_type, t.params)
+        out_dir = settings.output_dir
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, f"{t.id}{out_ext}")
+
+        params = dict(t.params or {})
+        logo_path = os.path.join(settings.upload_dir, f"{t.id}_logo.png")
+        if os.path.exists(logo_path):
+            params["logo_path"] = logo_path
+
+        cmd_args = build_ffmpeg_args(
+            {"operation_type": t.operation_type, "input_file": t.input_file, "params": params},
+            out_path,
+        )
+        log_path = os.path.join(settings.log_dir, f"{t.id}.log")
+        run_ffmpeg(
+            cmd_args=cmd_args,
+            total_sec=float(t.duration_sec or 0.0),
+            log_file_path=log_path,
+        )
+
+        t.status = TaskStatus.done
+        t.output_file = out_path
+        t.finished_at = datetime.now(timezone.utc)
+        t.expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.result_lifetime_hours)
+        db.commit()
+    except Exception as exc:
+        t = db.query(Task).filter(Task.id == uuid.UUID(task_id)).first()
+        if t:
+            t.status = TaskStatus.failed
+            t.error_message = str(exc)
+            t.finished_at = datetime.now(timezone.utc)
+            db.commit()
+    finally:
+        db.close()
 
 
 @pytest.fixture(scope="session", autouse=True)

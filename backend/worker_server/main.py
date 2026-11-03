@@ -10,6 +10,7 @@ import socket
 import tempfile
 import threading
 import time
+import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, status
@@ -19,6 +20,7 @@ import psutil
 
 from app.services.probe import probe_video
 from worker_server.ffmpeg_runner import (
+    ALLOWED_PRESETS,
     Cancelled,
     build_ffmpeg_args,
     check_audio_stream,
@@ -35,6 +37,7 @@ WORKER_CAPACITY = int(os.getenv("WORKER_CAPACITY", "1"))
 DISPATCHER_URL = os.getenv("DISPATCHER_URL", "")
 WORKER_TOKEN = os.getenv("WORKER_TOKEN", "super_secret_worker_token")
 MAX_FILE_MB = int(os.getenv("MAX_FILE_MB", "100"))
+TASK_TIMEOUT_SEC = float(os.getenv("TASK_TIMEOUT_SEC", "300"))
 
 
 def _resolve_default_data_dir() -> str:
@@ -240,13 +243,23 @@ def _execute_processing_sync(task_state: TaskState, op: str, params: dict, durat
             with tasks_lock:
                 task_state.progress = min(99, max(0, pct))
 
-        run_ffmpeg(
-            cmd_args=cmd_args,
-            total_sec=total_sec,
-            log_file_path=task_state.log_file or os.path.join(WORKER_DATA_DIR, "logs", f"{task_state.task_id}.log"),
-            cancel_event=task_state.cancel_event,
-            progress_callback=on_progress,
-        )
+        try:
+            run_ffmpeg(
+                cmd_args=cmd_args,
+                total_sec=total_sec,
+                log_file_path=task_state.log_file or os.path.join(WORKER_DATA_DIR, "logs", f"{task_state.task_id}.log"),
+                cancel_event=task_state.cancel_event,
+                progress_callback=on_progress,
+                timeout_sec=TASK_TIMEOUT_SEC,
+            )
+        except TypeError:
+            run_ffmpeg(
+                cmd_args=cmd_args,
+                total_sec=total_sec,
+                log_file_path=task_state.log_file or os.path.join(WORKER_DATA_DIR, "logs", f"{task_state.task_id}.log"),
+                cancel_event=task_state.cancel_event,
+                progress_callback=on_progress,
+            )
 
         with tasks_lock:
             task_state.status = "done"
@@ -260,6 +273,18 @@ def _execute_processing_sync(task_state: TaskState, op: str, params: dict, durat
             task_state.status = "cancelled"
             task_state.finished_at = datetime.now(timezone.utc).isoformat()
             task_state.error = "Task cancelled by user"
+        if task_state.output_file and os.path.exists(task_state.output_file):
+            try:
+                os.remove(task_state.output_file)
+            except OSError:
+                pass
+
+    except TimeoutError as exc:
+        logger.error("Task %s timed out on worker %s: %s", task_state.task_id, WORKER_ID, exc)
+        with tasks_lock:
+            task_state.status = "failed"
+            task_state.error = str(exc)
+            task_state.finished_at = datetime.now(timezone.utc).isoformat()
         if task_state.output_file and os.path.exists(task_state.output_file):
             try:
                 os.remove(task_state.output_file)
@@ -283,6 +308,14 @@ async def execute_task(
     file: UploadFile = File(...),
     logo: Optional[UploadFile] = File(None),
 ):
+    try:
+        uuid.UUID(str(task_id))
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid task_id: must be a valid UUID",
+        )
+
     with tasks_lock:
         existing = tasks.get(task_id)
         if existing:
@@ -323,6 +356,9 @@ async def execute_task(
             parsed_params = {}
 
     parsed_params.pop("logo_path", None)
+    if "preset" in parsed_params:
+        p_preset = str(parsed_params["preset"]).strip().lower()
+        parsed_params["preset"] = p_preset if p_preset in ALLOWED_PRESETS else "medium"
 
     inputs_dir = os.path.join(WORKER_DATA_DIR, "inputs")
     logs_dir = os.path.join(WORKER_DATA_DIR, "logs")

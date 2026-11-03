@@ -36,7 +36,7 @@ services:
     build: ./backend
     command: uvicorn dispatcher.main:app --host 0.0.0.0 --port 8100
     ports:
-      - "8100:8100"
+      - "127.0.0.1:8100:8100"
     env_file:
       - .env
     volumes:
@@ -91,6 +91,8 @@ services:
     command: uvicorn worker_server.main:app --host 0.0.0.0 --port 9000
     env_file:
       - .env
+    environment:
+      - DISPATCHER_URL=http://dispatcher:8100
     volumes:
       - ./backend:/app
     cpus: "2"

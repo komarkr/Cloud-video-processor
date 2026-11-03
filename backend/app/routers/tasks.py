@@ -192,6 +192,10 @@ async def create_task(
             parsed_params = {"raw": params}
 
     parsed_params.pop("logo_path", None)
+    if "preset" in parsed_params:
+        p_preset = str(parsed_params["preset"]).strip().lower()
+        allowed_presets = {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}
+        parsed_params["preset"] = p_preset if p_preset in allowed_presets else "medium"
 
     op = (operation_type or "convert").lower()
     if op == "watermark":

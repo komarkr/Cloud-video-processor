@@ -32,11 +32,13 @@ class VideoProcessingUser(HttpUser):
     @task
     def process_video_lifecycle(self):
         """Upload video and poll until processing is completed."""
-        video_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "test_short.mp4"))
-        if not os.path.exists(video_path):
-            video_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "uploads", "short.mp4"))
-
-        if not os.path.exists(video_path):
+        candidates = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "test_short.mp4")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "demo_videos", "2_OK_cyber_particles_20s.mp4")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "backend", "tests", "fixtures", "videos", "test_5s.mp4")),
+        ]
+        video_path = next((p for p in candidates if os.path.exists(p)), None)
+        if not video_path:
             return
 
         with open(video_path, "rb") as video_file:

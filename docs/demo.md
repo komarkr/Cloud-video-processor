@@ -16,19 +16,24 @@
    cp .env.example .env
    ```
 
-3. **Запуск усього стеку сервісів однією командою:**
+3. **Збірка статичного фронтенду:**
    ```bash
-   docker compose down -v
-   docker compose up --build -d
+   npm --prefix frontend run build
    ```
 
-4. **Перевірка готовності контейнерів:**
+4. **Запуск усього стеку сервісів з 2 воркерами:**
+   ```bash
+   docker compose down -v
+   docker compose up --build -d --scale worker=2
+   ```
+
+5. **Перевірка готовності контейнерів:**
    ```bash
    docker compose ps
    ```
-   *Очікуваний стан:* сервіси `postgres`, `redis`, `api1`, `api2`, `dispatcher`, `worker`, `autoscaler`, `nginx` мають статус `Up` (сервіс `migrate` завершується зі статусом `Exited (0)` після застосування міграцій).
+   *Очікуваний стан:* сервіси `postgres`, `redis`, `api1`, `api2`, `dispatcher`, два екземпляри `worker`, `autoscaler`, `nginx` мають статус `Up` (сервіс `migrate` завершується зі статусом `Exited (0)` після застосування міграцій).
 
-5. **Відкриття вебінтерфейсу:**
+6. **Відкриття вебінтерфейсу:**
    - URL: **`https://localhost`**
    - *Примітка щодо SSL:* сертифікат видано для `localhost` через `mkcert`. Якщо браузер попереджає про самопідписаний сертифікат, оберіть «Продовжити (небезпечно)» або заздалегідь додайте кореневий сертифікат mkcert у систему (`mkcert -install` або `certutil -user -addstore Root nginx\certs\localhost.pem`).
 

@@ -124,6 +124,19 @@ def check_audio_stream(input_file: str) -> bool:
         return False
 
 
+ALLOWED_PRESETS = {
+    "ultrafast",
+    "superfast",
+    "veryfast",
+    "faster",
+    "fast",
+    "medium",
+    "slow",
+    "slower",
+    "veryslow",
+}
+
+
 def build_ffmpeg_args(task: Any, output_path: str) -> list[str]:
     if isinstance(task, dict):
         op = (task.get("operation_type") or "convert").lower()
@@ -134,7 +147,8 @@ def build_ffmpeg_args(task: Any, output_path: str) -> list[str]:
         input_file = getattr(task, "input_file", None)
         params = getattr(task, "params", {}) or {}
 
-    preset = params.get("preset", "medium")
+    raw_preset = str(params.get("preset", "")).strip().lower()
+    preset = raw_preset if raw_preset in ALLOWED_PRESETS else "medium"
 
     if op == "convert":
         return [
@@ -267,6 +281,7 @@ def run_ffmpeg(
     log_file_path: str,
     cancel_event: Optional[threading.Event] = None,
     progress_callback: Optional[Callable[[int], None]] = None,
+    timeout_sec: float = 300.0,
 ) -> None:
     if cancel_event and cancel_event.is_set():
         raise Cancelled()
@@ -283,6 +298,7 @@ def run_ffmpeg(
         *cmd_args,
     ]
 
+    start_time = time.time()
     with open(log_file_path, "w", encoding="utf-8", errors="replace") as log:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log, text=True)
         last_check = 0.0
@@ -297,6 +313,14 @@ def run_ffmpeg(
                         pass
 
                 now = time.time()
+                if timeout_sec > 0 and (now - start_time) > timeout_sec:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                    raise TimeoutError(f"Task execution timed out after {int(timeout_sec)}s")
+
                 if now - last_check > 0.5:
                     last_check = now
                     if cancel_event and cancel_event.is_set():
@@ -307,7 +331,17 @@ def run_ffmpeg(
                             proc.kill()
                         raise Cancelled()
 
-        ret = proc.wait()
+        remaining_timeout = None
+        if timeout_sec > 0:
+            elapsed = time.time() - start_time
+            remaining_timeout = max(0.1, timeout_sec - elapsed)
+
+        try:
+            ret = proc.wait(timeout=remaining_timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise TimeoutError(f"Task execution timed out after {int(timeout_sec)}s")
+
         if cancel_event and cancel_event.is_set():
             raise Cancelled()
         if ret != 0:

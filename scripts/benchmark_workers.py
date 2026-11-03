@@ -17,8 +17,20 @@ VIDEO_PATH = os.path.join(ROOT_DIR, "data", "test_short.mp4")
 def ensure_test_video():
     """Ensure test video exists in data/test_short.mp4."""
     if not os.path.exists(VIDEO_PATH):
-        print(f"Generating test video at {VIDEO_PATH}...")
+        print(f"Ensuring test video at {VIDEO_PATH}...")
         os.makedirs(os.path.dirname(VIDEO_PATH), exist_ok=True)
+        candidates = [
+            os.path.join(ROOT_DIR, "demo_videos", "2_OK_cyber_particles_20s.mp4"),
+            os.path.join(ROOT_DIR, "backend", "tests", "fixtures", "videos", "test_5s.mp4"),
+            os.path.join(ROOT_DIR, "frontend", "public", "samples", "cyber_particles_20s.mp4"),
+        ]
+        found = next((c for c in candidates if os.path.exists(c)), None)
+        if found:
+            import shutil
+            shutil.copy2(found, VIDEO_PATH)
+            print(f"Copied test video from {found} to {VIDEO_PATH}")
+            return
+
         cmd = [
             "docker", "compose", "exec", "api1", "ffmpeg", "-y",
             "-f", "lavfi", "-i", "testsrc=duration=20:size=1280x720:rate=25",

@@ -69,7 +69,7 @@ def test_status_endpoint_returns_metrics(client):
 def test_execute_and_progress_flow(client, monkeypatch):
     task_id = str(uuid.uuid4())
 
-    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None):
+    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None, **kwargs):
         if progress_callback:
             progress_callback(50)
         time.sleep(0.05)
@@ -105,7 +105,7 @@ def test_execute_and_progress_flow(client, monkeypatch):
 def test_execute_is_idempotent(client, monkeypatch):
     task_id = str(uuid.uuid4())
 
-    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None):
+    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None, **kwargs):
         time.sleep(0.5)
 
     monkeypatch.setattr("worker_server.main.run_ffmpeg", fake_run_ffmpeg)
@@ -178,7 +178,7 @@ def test_insufficient_storage_returns_507(client, monkeypatch):
 def test_cancel_task_endpoint(client, monkeypatch):
     task_id = str(uuid.uuid4())
 
-    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None):
+    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None, **kwargs):
         while not (cancel_event and cancel_event.is_set()):
             time.sleep(0.02)
         raise Cancelled()
@@ -215,7 +215,7 @@ def test_cancel_task_endpoint(client, monkeypatch):
 def test_result_download_and_conflict_handling(client, monkeypatch):
     task_id = str(uuid.uuid4())
 
-    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None):
+    def fake_run_ffmpeg(cmd_args, total_sec, log_file_path, cancel_event=None, progress_callback=None, **kwargs):
         time.sleep(0.5)
 
     monkeypatch.setattr("worker_server.main.run_ffmpeg", fake_run_ffmpeg)
@@ -290,4 +290,45 @@ def test_build_ffmpeg_args_all_operations():
     args_extract = build_ffmpeg_args(t_extract, "/tmp/out.mp3")
     assert "-vn" in args_extract
     assert "-c:a" in args_extract and "libmp3lame" in args_extract
+
+
+def test_execute_task_invalid_uuid_returns_422(client):
+    r = client.post(
+        "/execute",
+        headers={"X-Worker-Token": WORKER_TOKEN},
+        data={"task_id": "not-a-valid-uuid-1234", "operation_type": "convert"},
+        files={"file": ("test.mp4", io.BytesIO(b"fake"), "video/mp4")},
+    )
+    assert r.status_code == 422
+    assert "UUID" in r.text
+
+
+def test_preset_sanitization_fallback_to_medium():
+    t_invalid = {"operation_type": "convert", "input_file": "/tmp/in.mp4", "params": {"preset": "dangerous_preset"}}
+    args = build_ffmpeg_args(t_invalid, "/tmp/out.mp4")
+    assert "-preset" in args
+    p_idx = args.index("-preset")
+    assert args[p_idx + 1] == "medium"
+
+    t_valid = {"operation_type": "convert", "input_file": "/tmp/in.mp4", "params": {"preset": "ultrafast"}}
+    args_valid = build_ffmpeg_args(t_valid, "/tmp/out.mp4")
+    p_idx = args_valid.index("-preset")
+    assert args_valid[p_idx + 1] == "ultrafast"
+
+
+def test_run_ffmpeg_timeout_handling(monkeypatch):
+    class FakeProc:
+        def __init__(self):
+            self.stdout = ["out_time_us=1000000\n"]
+        def terminate(self):
+            pass
+        def wait(self, timeout=None):
+            time.sleep(0.05)
+            raise TimeoutError("Task execution timed out")
+        def kill(self):
+            pass
+
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **kw: FakeProc())
+    with pytest.raises(TimeoutError):
+        run_ffmpeg(cmd_args=[], total_sec=10.0, log_file_path=tempfile.mktemp(), timeout_sec=0.01)
 
